@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color primary = Color(0xFFFF6B6B);
-  static const Color background = Color(0xFFFFF9E6);
+  static const Color primary = Color(0xFFEEBD2B); // 레퍼런스 골든 옐로우
+  static const Color background = Color(0xFFF8F7F6); // 레퍼런스 배경
 
   // 드로잉 팔레트 기본 색상 (10색)
   static const List<Color> palette = [
@@ -18,11 +18,11 @@ class AppColors {
     Color(0xFFFFFFFF), // 흰색
   ];
 
-  // 모드 카드 배경 색상
-  static const List<Color> modeCardColors = [
-    Color(0xFFFFB3B3), // 연분홍
-    Color(0xFFB3D9FF), // 연파랑
-    Color(0xFFB3FFB3), // 연초록
-    Color(0xFFFFE0B3), // 연주황
+  // 모드 카드 배경 색상 (이미지 없을 때 플레이스홀더)
+  static const List<Color> modeCardBg = [
+    Color(0xFFFEF3C7), // 자유그리기 - 크림
+    Color(0xFFFFEDD5), // 선따라 - 피치
+    Color(0xFFCCFBF1), // 색칠 - 민트
+    Color(0xFFDBEAFE), // 대칭 - 스카이
   ];
 }

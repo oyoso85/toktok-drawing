@@ -1,115 +1,520 @@
 import 'package:flutter/material.dart';
+import 'package:toktok_drawing/core/constants/app_colors.dart';
 import 'package:toktok_drawing/features/drawing/placeholder_drawing_screen.dart';
 import 'package:toktok_drawing/features/free_drawing/free_drawing_screen.dart';
 import 'package:toktok_drawing/features/mode_selection/models/mode_info.dart';
 import 'package:toktok_drawing/features/mode_selection/widgets/mode_card.dart';
+import 'package:toktok_drawing/features/color_by_symbol/color_by_symbol_screen.dart';
+import 'package:toktok_drawing/features/trace_drawing/trace_drawing_screen.dart';
 import 'package:toktok_drawing/shared/models/drawing_mode.dart';
+
+const _kPrimary = AppColors.primary;
 
 class ModeSelectionScreen extends StatelessWidget {
   const ModeSelectionScreen({super.key});
 
-  /// 모드별 드로잉 화면으로 이동 (4.4).
-  /// 태스크 5~8 구현 시 각 case를 실제 화면 위젯으로 교체.
-  void _navigateToDrawing(BuildContext context, ModeInfo info) {
-    final Widget screen = _buildDrawingScreen(info.mode, info.title);
-
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => screen),
-    );
-  }
-
-  Widget _buildDrawingScreen(DrawingMode mode, String title) {
-    // 각 모드별 실제 화면은 태스크 5~8에서 이 switch를 교체함
-    switch (mode) {
-      case DrawingMode.free:
-        return const FreeDrawingScreen();
-      case DrawingMode.trace:
-        return PlaceholderDrawingScreen(
-          mode: mode,
-          title: title,
-          onAutoSave: () async {
-            // 태스크 6에서 TraceDrawingProvider.save() 연결
-          },
-        );
-      case DrawingMode.colorBySymbol:
-        return PlaceholderDrawingScreen(
-          mode: mode,
-          title: title,
-          onAutoSave: () async {
-            // 태스크 7에서 ColorBySymbolProvider.save() 연결
-          },
-        );
-      case DrawingMode.symmetry:
-        return PlaceholderDrawingScreen(
-          mode: mode,
-          title: title,
-          onAutoSave: () async {
-            // 태스크 8에서 SymmetryDrawingProvider.save() 연결
-          },
-        );
-    }
+  void _go(BuildContext context, ModeInfo info) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => switch (info.mode) {
+        DrawingMode.free => const FreeDrawingScreen(),
+        DrawingMode.trace => const TraceDrawingScreen(),
+        DrawingMode.colorBySymbol => const ColorBySymbolScreen(),
+        _ => PlaceholderDrawingScreen(
+            mode: info.mode,
+            title: info.title,
+            onAutoSave: () async {},
+          ),
+      },
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            const _AppHeader(),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.85,
-                  ),
-                  itemCount: ModeInfo.registry.length,
-                  itemBuilder: (context, index) {
-                    final info = ModeInfo.registry[index];
-                    return ModeCard(
-                      modeInfo: info,
-                      index: index,
-                      onTap: () => _navigateToDrawing(context, info),
-                    );
-                  },
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          const _BgCircles(),
+          SafeArea(
+            child: Column(
+              children: [
+                const _TopBar(),
+                Expanded(
+                  child: _Body(onTap: (info) => _go(context, info)),
                 ),
-              ),
+                const _BottomBar(),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 배경 장식 원 ─────────────────────────────────────────────────────────────
+
+class _BgCircles extends StatelessWidget {
+  const _BgCircles();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned(
+          top: -80,
+          left: -80,
+          child: _Circle(320, _kPrimary.withValues(alpha: 0.10)),
+        ),
+        Positioned(
+          top: MediaQuery.of(context).size.height / 2,
+          right: -80,
+          child: _Circle(240, _kPrimary.withValues(alpha: 0.05)),
+        ),
+        Positioned(
+          bottom: -80,
+          left: MediaQuery.of(context).size.width / 4,
+          child: _Circle(380, _kPrimary.withValues(alpha: 0.10)),
+        ),
+      ],
+    );
+  }
+}
+
+class _Circle extends StatelessWidget {
+  final double size;
+  final Color color;
+  const _Circle(this.size, this.color);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
+}
+
+// ── 상단 앱바 ────────────────────────────────────────────────────────────────
+
+class _TopBar extends StatelessWidget {
+  const _TopBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          _RoundButton(icon: Icons.home_rounded, onTap: () {}),
+          const Expanded(child: _Title()),
+          const _ScoreBadge(score: 1240),
+          const SizedBox(width: 12),
+          _RoundButton(
+            icon: Icons.settings_rounded,
+            iconColor: Colors.grey.shade500,
+            borderColor: Colors.grey.shade200,
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoundButton extends StatelessWidget {
+  final IconData icon;
+  final Color? iconColor;
+  final Color? borderColor;
+  final VoidCallback onTap;
+
+  const _RoundButton({
+    required this.icon,
+    this.iconColor,
+    this.borderColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: borderColor ?? _kPrimary.withValues(alpha: 0.3),
+            width: 3,
+          ),
+          boxShadow: const [
+            BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
           ],
+        ),
+        child: Icon(
+          icon,
+          color: iconColor ?? _kPrimary,
+          size: 26,
         ),
       ),
     );
   }
 }
 
-class _AppHeader extends StatelessWidget {
-  const _AppHeader();
+class _Title extends StatelessWidget {
+  const _Title();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        children: [
-          Text(
-            '톡톡 그림판',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+    return Column(
+      children: [
+        const Text(
+          '톡톡 그림판',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+            color: _kPrimary,
+            letterSpacing: 1.5,
+            height: 1.1,
           ),
-          const SizedBox(height: 4),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _TitleDot(size: 8, color: _kPrimary),
+            const SizedBox(width: 3),
+            _TitleDash(),
+            const SizedBox(width: 3),
+            _TitleDot(size: 8, color: _kPrimary),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TitleDot extends StatelessWidget {
+  final double size;
+  final Color color;
+  const _TitleDot({required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
+}
+
+class _TitleDash extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 28,
+        height: 8,
+        decoration: BoxDecoration(
+          color: _kPrimary.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(4),
+        ),
+      );
+}
+
+class _ScoreBadge extends StatelessWidget {
+  final int score;
+  const _ScoreBadge({required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: _kPrimary.withValues(alpha: 0.3), width: 3),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.star_rounded, color: _kPrimary, size: 20),
+          const SizedBox(width: 4),
           Text(
-            '어떤 그림을 그려볼까요?',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.black54,
-                ),
+            '$score',
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: Color(0xFF1E293B),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── 본문: 좌(마스코트) + 우(카드 2줄) ──────────────────────────────────────────
+
+class _Body extends StatelessWidget {
+  final void Function(ModeInfo) onTap;
+  const _Body({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final modes = ModeInfo.registry;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 0, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 좌: 마스코트 (화면의 약 30%)
+          SizedBox(
+            width: MediaQuery.of(context).size.width * 0.30,
+            child: const _MascotColumn(),
+          ),
+          const SizedBox(width: 16),
+          // 우: 카드 2줄 (가로 스크롤)
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _CardRow(modes: modes.take(2).toList(), onTap: onTap),
+                const SizedBox(height: 14),
+                _CardRow(modes: modes.skip(2).take(2).toList(), onTap: onTap),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 마스코트 컬럼 (좌측 고정 영역) ───────────────────────────────────────────
+
+class _MascotColumn extends StatefulWidget {
+  const _MascotColumn();
+
+  @override
+  State<_MascotColumn> createState() => _MascotColumnState();
+}
+
+class _MascotColumnState extends State<_MascotColumn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+  late final Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    _scaleAnim = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // 마스코트 이미지 (pulsing) - Flexible로 남은 공간만큼만 차지
+        Flexible(
+          child: ScaleTransition(
+            scale: _scaleAnim,
+            child: Image.asset(
+              'assets/images/mascot.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // LET'S DRAW! 버튼
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(color: _kPrimary, width: 3),
+            boxShadow: [
+              BoxShadow(
+                color: _kPrimary.withValues(alpha: 0.35),
+                offset: const Offset(0, 5),
+                blurRadius: 0,
+              ),
+            ],
+          ),
+          child: const Text(
+            "LET'S DRAW!",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              color: _kPrimary,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+// ── 카드 행 (가로 스크롤) ─────────────────────────────────────────────────────
+
+class _CardRow extends StatelessWidget {
+  final List<ModeInfo> modes;
+  final void Function(ModeInfo) onTap;
+
+  const _CardRow({required this.modes, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 160,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: modes.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, i) => ModeCard(
+          modeInfo: modes[i],
+          index: i,
+          onTap: () => onTap(modes[i]),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 하단 바 ──────────────────────────────────────────────────────────────────
+
+class _BottomBar extends StatelessWidget {
+  const _BottomBar();
+
+  void _snack(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('준비 중이에요! 🚧'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          child: Row(
+            children: [
+              _PillButton(
+                icon: Icons.photo_library_rounded,
+                label: '내 갤러리',
+                onTap: () => _snack(context),
+              ),
+              const SizedBox(width: 12),
+              _PillButton(
+                icon: Icons.star_rounded,
+                label: 'Daily Challenge',
+                onTap: () => _snack(context),
+              ),
+              const Spacer(),
+              Text(
+                '열심히 그려봐요! ',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.grey.shade400,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _snack(context),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: _kPrimary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PillButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _PillButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: _kPrimary.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(
+            color: _kPrimary.withValues(alpha: 0.3),
+            width: 2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: _kPrimary, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: _kPrimary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

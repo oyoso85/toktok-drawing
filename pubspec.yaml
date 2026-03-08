@@ -28,6 +28,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/images/
     - assets/templates/trace/
     - assets/templates/coloring/
     - assets/brushes/
