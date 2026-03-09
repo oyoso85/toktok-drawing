@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:toktok_drawing/core/constants/app_colors.dart';
 import 'package:toktok_drawing/core/utils/palette_utils.dart';
 import 'package:toktok_drawing/shared/models/drawing_tool.dart';
 import 'package:toktok_drawing/shared/models/rainbow_stroke.dart';
@@ -50,9 +51,13 @@ class FreeDrawingNotifier extends Notifier<FreeDrawingState> {
         );
 
       default:
+        // 무지개 센티넬은 일반 도구에서 사용 불가 → 흰색으로 fallback
+        final strokeColor = state.selectedColor == AppColors.kRainbow
+            ? const Color(0xFFFFFFFF)
+            : state.selectedColor;
         final stroke = Stroke(
           points: [point],
-          color: state.selectedColor,
+          color: strokeColor,
           size: state.selectedSize,
           tool: state.selectedTool,
         );

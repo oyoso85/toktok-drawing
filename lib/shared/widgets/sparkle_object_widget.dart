@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:toktok_drawing/shared/models/sparkle_element.dart';
 import 'package:toktok_drawing/shared/widgets/sparkle_shape_painter.dart';
@@ -26,9 +27,10 @@ class _SparkleObjectWidgetState extends State<SparkleObjectWidget>
   @override
   void initState() {
     super.initState();
+    final durationMs = 1000 + Random().nextInt(2001); // 1000~3000ms 랜덤
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1050),
+      duration: Duration(milliseconds: durationMs),
     );
     _scaleAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
