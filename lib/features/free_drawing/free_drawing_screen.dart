@@ -1,14 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:toktok_drawing/shared/models/sparkle_element.dart';
+import 'package:toktok_drawing/shared/widgets/sparkle_object_widget.dart';
 import 'providers/free_drawing_provider.dart';
+import 'providers/free_drawing_state.dart';
 import 'widgets/drawing_canvas.dart';
 import 'package:toktok_drawing/shared/widgets/drawing_toolbar.dart';
 
-class FreeDrawingScreen extends ConsumerWidget {
+class FreeDrawingScreen extends ConsumerStatefulWidget {
   const FreeDrawingScreen({super.key});
 
-  // 5.7 전체 지우기 확인 다이얼로그
-  void _confirmClearAll(BuildContext context, FreeDrawingNotifier notifier) {
+  @override
+  ConsumerState<FreeDrawingScreen> createState() => _FreeDrawingScreenState();
+}
+
+class _FreeDrawingScreenState extends ConsumerState<FreeDrawingScreen> {
+  // 현재 피어나는 애니메이션 중인 파티클 목록
+  final List<SparkleObject> _animatingObjects = [];
+
+  void _confirmClearAll(FreeDrawingNotifier notifier) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -22,6 +32,7 @@ class FreeDrawingScreen extends ConsumerWidget {
           ElevatedButton(
             onPressed: () {
               notifier.clearAll();
+              setState(() => _animatingObjects.clear());
               Navigator.of(ctx).pop();
             },
             child: const Text('지우기'),
@@ -31,12 +42,7 @@ class FreeDrawingScreen extends ConsumerWidget {
     );
   }
 
-  // 5.6 배경색 선택 바텀시트
-  void _showBgColorPicker(
-    BuildContext context,
-    FreeDrawingNotifier notifier,
-    Color current,
-  ) {
+  void _showBgColorPicker(FreeDrawingNotifier notifier, Color current) {
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => _BgColorSheet(
@@ -50,12 +56,25 @@ class FreeDrawingScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    // 꽃씨 붓 새 파티클 감지 → 애니메이션 큐에 추가
+    ref.listen<FreeDrawingState>(freeDrawingProvider, (prev, next) {
+      final prevCurrent = prev?.currentElement;
+      final nextCurrent = next.currentElement;
+      if (nextCurrent is SparkleElement) {
+        final prevCount =
+            prevCurrent is SparkleElement ? prevCurrent.objects.length : 0;
+        final newObjects = nextCurrent.objects.skip(prevCount).toList();
+        if (newObjects.isNotEmpty) {
+          setState(() => _animatingObjects.addAll(newObjects));
+        }
+      }
+    });
+
     final state = ref.watch(freeDrawingProvider);
     final notifier = ref.read(freeDrawingProvider.notifier);
 
     return PopScope(
-      // 4.5 자동 저장 연동 (태스크 9에서 StorageService.save() 연결)
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) {
           // TODO(task-9): await storageService.save(state)
@@ -66,7 +85,6 @@ class FreeDrawingScreen extends ConsumerWidget {
           title: const Text('자유 그리기'),
           centerTitle: true,
           actions: [
-            // 5.6 배경색 버튼
             IconButton(
               tooltip: '배경색',
               icon: Container(
@@ -79,26 +97,39 @@ class FreeDrawingScreen extends ConsumerWidget {
                 ),
               ),
               onPressed: () =>
-                  _showBgColorPicker(context, notifier, state.backgroundColor),
+                  _showBgColorPicker(notifier, state.backgroundColor),
             ),
-            // 5.7 전체 지우기 버튼
             IconButton(
               tooltip: '전체 지우기',
               icon: const Icon(Icons.delete_outline_rounded),
-              onPressed: () => _confirmClearAll(context, notifier),
+              onPressed: () => _confirmClearAll(notifier),
             ),
           ],
         ),
         body: Column(
           children: [
             Expanded(
-              child: DrawingCanvas(
-                strokes: state.strokes,
-                currentStroke: state.currentStroke,
-                backgroundColor: state.backgroundColor,
-                onPanStart: notifier.startStroke,
-                onPanUpdate: notifier.addPoint,
-                onPanEnd: notifier.endStroke,
+              child: Stack(
+                children: [
+                  DrawingCanvas(
+                    elements: state.elements,
+                    currentElement: state.currentElement,
+                    backgroundColor: state.backgroundColor,
+                    onPanStart: notifier.startStroke,
+                    onPanUpdate: notifier.addPoint,
+                    onPanEnd: notifier.endStroke,
+                  ),
+                  // 꽃씨 붓 피어나는 애니메이션 오버레이
+                  ..._animatingObjects.map((obj) => SparkleObjectWidget(
+                        key: ValueKey(identityHashCode(obj)),
+                        object: obj,
+                        onComplete: () {
+                          if (mounted) {
+                            setState(() => _animatingObjects.remove(obj));
+                          }
+                        },
+                      )),
+                ],
               ),
             ),
             DrawingToolbar(
@@ -120,19 +151,18 @@ class FreeDrawingScreen extends ConsumerWidget {
   }
 }
 
-// 5.6 배경색 선택 시트
 class _BgColorSheet extends StatelessWidget {
   final Color current;
   final ValueChanged<Color> onSelected;
 
   static const _bgColors = [
     Colors.white,
-    Color(0xFFFFF9E6), // 크림
-    Color(0xFFE8F5E9), // 연초록
-    Color(0xFFE3F2FD), // 연파랑
-    Color(0xFFFCE4EC), // 연분홍
-    Color(0xFFFFF8E1), // 연노랑
-    Color(0xFF37474F), // 다크 그레이
+    Color(0xFFFFF9E6),
+    Color(0xFFE8F5E9),
+    Color(0xFFE3F2FD),
+    Color(0xFFFCE4EC),
+    Color(0xFFFFF8E1),
+    Color(0xFF37474F),
   ];
 
   const _BgColorSheet({required this.current, required this.onSelected});

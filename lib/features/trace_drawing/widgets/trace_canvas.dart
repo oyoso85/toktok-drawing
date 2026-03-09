@@ -150,6 +150,8 @@ class _TracePainter extends CustomPainter {
         _drawPencil(canvas, stroke);
       case DrawingTool.eraser:
         _drawEraser(canvas, stroke);
+      default:
+        _drawPen(canvas, stroke);
     }
   }
 

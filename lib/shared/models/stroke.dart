@@ -1,7 +1,11 @@
 import 'dart:ui';
+import 'package:toktok_drawing/shared/models/drawing_element.dart';
 import 'package:toktok_drawing/shared/models/drawing_tool.dart';
 
-class Stroke {
+class Stroke implements DrawingElement {
+  @override
+  String get type => 'stroke';
+
   final List<Offset> points;
   final Color color;
   final double size;
@@ -28,8 +32,10 @@ class Stroke {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() {
     return {
+      'type': type,
       'points': points.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
       'color': color.toARGB32(),
       'size': size,

@@ -3,4 +3,6 @@ enum DrawingTool {
   brush,
   pencil,
   eraser,
+  rainbowBrush,
+  sparkleBrush,
 }
