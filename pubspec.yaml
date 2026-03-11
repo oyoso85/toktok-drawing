@@ -32,3 +32,6 @@ flutter:
     - assets/templates/trace/
     - assets/templates/coloring/
     - assets/brushes/
+
+  shaders:
+    - assets/shaders/pencil.frag

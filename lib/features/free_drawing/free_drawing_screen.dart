@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toktok_drawing/shared/models/sparkle_element.dart';
@@ -17,6 +18,30 @@ class FreeDrawingScreen extends ConsumerStatefulWidget {
 class _FreeDrawingScreenState extends ConsumerState<FreeDrawingScreen> {
   // 현재 피어나는 애니메이션 중인 파티클 목록
   final List<SparkleObject> _animatingObjects = [];
+
+  // 색연필 Fragment Shader (비동기 로드)
+  ui.FragmentShader? _pencilShader;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPencilShader();
+  }
+
+  Future<void> _loadPencilShader() async {
+    try {
+      final program = await ui.FragmentProgram.fromAsset(
+        'assets/shaders/pencil.frag',
+      );
+      if (mounted) {
+        setState(() => _pencilShader = program.fragmentShader());
+        debugPrint('pencil shader loaded OK');
+      }
+    } catch (e) {
+      // shader 로드 실패 시 fallback(그레인 파티클)으로 자동 전환
+      debugPrint('pencil shader load FAILED: $e');
+    }
+  }
 
   void _confirmClearAll(FreeDrawingNotifier notifier) {
     showDialog<void>(
@@ -118,6 +143,7 @@ class _FreeDrawingScreenState extends ConsumerState<FreeDrawingScreen> {
                     onPanStart: notifier.startStroke,
                     onPanUpdate: notifier.addPoint,
                     onPanEnd: notifier.endStroke,
+                    pencilShader: _pencilShader,
                   ),
                   // 꽃씨 붓 피어나는 애니메이션 오버레이
                   ..._animatingObjects.map((obj) => SparkleObjectWidget(

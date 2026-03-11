@@ -17,6 +17,7 @@ class DrawingCanvas extends StatelessWidget {
   final void Function(Offset) onPanStart;
   final void Function(Offset) onPanUpdate;
   final VoidCallback onPanEnd;
+  final ui.FragmentShader? pencilShader;
 
   const DrawingCanvas({
     super.key,
@@ -26,6 +27,7 @@ class DrawingCanvas extends StatelessWidget {
     required this.onPanStart,
     required this.onPanUpdate,
     required this.onPanEnd,
+    this.pencilShader,
   });
 
   @override
@@ -40,6 +42,7 @@ class DrawingCanvas extends StatelessWidget {
             elements: elements,
             currentElement: currentElement,
             backgroundColor: backgroundColor,
+            pencilShader: pencilShader,
           ),
           child: const SizedBox.expand(),
         ),
@@ -52,11 +55,13 @@ class _CanvasPainter extends CustomPainter {
   final List<DrawingElement> elements;
   final DrawingElement? currentElement;
   final Color backgroundColor;
+  final ui.FragmentShader? pencilShader;
 
   const _CanvasPainter({
     required this.elements,
     required this.currentElement,
     required this.backgroundColor,
+    this.pencilShader,
   });
 
   @override
@@ -75,6 +80,7 @@ class _CanvasPainter extends CustomPainter {
   }
 
   void _drawElement(Canvas canvas, DrawingElement el) {
+    debugPrint('[element] type=${el.runtimeType}');
     if (el is Stroke) {
       _drawStroke(canvas, el);
     } else if (el is RainbowStroke) {
@@ -87,6 +93,7 @@ class _CanvasPainter extends CustomPainter {
   // ── 일반 Stroke ────────────────────────────────────────
   void _drawStroke(Canvas canvas, Stroke stroke) {
     if (stroke.points.isEmpty) return;
+    debugPrint('[stroke] tool=${stroke.tool}, points=${stroke.points.length}, color=${stroke.color}');
     switch (stroke.tool) {
       case DrawingTool.pen:
         _drawPen(canvas, stroke);
@@ -135,6 +142,14 @@ class _CanvasPainter extends CustomPainter {
     if (stroke.points.isEmpty) return;
     final points = stroke.points;
 
+    debugPrint('[pencil] points=${points.length}, shader=${pencilShader != null}, color=${stroke.color}, size=${stroke.size}');
+
+    if (pencilShader != null) {
+      _drawPencilWithShader(canvas, stroke);
+      return;
+    }
+
+    // shader 미로드 시 fallback: 그레인 파티클 방식
     if (points.length == 1) {
       canvas.drawCircle(points[0], stroke.size * 0.45, Paint()
         ..color = stroke.color.withValues(alpha: 0.6)
@@ -142,35 +157,72 @@ class _CanvasPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.0));
       return;
     }
-
-    // 1. 베이스 획: 반투명 + 살짝 가늘게
     canvas.drawPath(_smoothPath(points), Paint()
       ..color = stroke.color.withValues(alpha: 0.55)
       ..strokeWidth = stroke.size * 0.75
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke);
-
-    // 2. 그레인 파티클: 경로 주변에 작은 점 산포 → 색연필 결 표현
-    // 위치 + 인덱스 기반 결정론적 시드로 리렌더 시 깜빡임 방지
     final half = stroke.size / 2;
     final grainPaint = Paint()..style = PaintingStyle.fill;
-
     for (int i = 0; i < points.length; i += 2) {
       final p = points[i];
       final seed = (i * 31 + (p.dx * 13).round() + (p.dy * 17).round()).abs();
       final rng = math.Random(seed);
-      final count = 3 + rng.nextInt(3); // 3~5개
+      final count = 3 + rng.nextInt(3);
       for (int j = 0; j < count; j++) {
         final dx = (rng.nextDouble() * 2 - 1) * half;
         final dy = (rng.nextDouble() * 2 - 1) * half;
-        if (dx * dx + dy * dy > half * half) continue; // 원 영역으로 제한
+        if (dx * dx + dy * dy > half * half) continue;
         final a = 0.08 + rng.nextDouble() * 0.28;
         final r = stroke.size * (0.04 + rng.nextDouble() * 0.08);
         grainPaint.color = stroke.color.withValues(alpha: a);
         canvas.drawCircle(Offset(p.dx + dx, p.dy + dy), r, grainPaint);
       }
     }
+  }
+
+  // ── 색연필: Fragment Shader로 Value Noise 기반 결 텍스처 렌더링 ──────────
+  // CanvasKit web에서 FragmentShader는 PaintingStyle.fill 에서만 작동.
+  // perfect_freehand로 pencil 외곽선 생성 후 fill + shader 적용.
+  void _drawPencilWithShader(Canvas canvas, Stroke stroke) {
+    if (stroke.points.isEmpty) return;
+    final shader = pencilShader!;
+    final points = stroke.points;
+
+    if (points.length == 1) {
+      canvas.drawCircle(points[0], stroke.size * 0.45, Paint()
+        ..color = stroke.color.withValues(alpha: 0.6)
+        ..style = PaintingStyle.fill);
+      return;
+    }
+
+    // perfect_freehand로 색연필 외곽선 생성 (붓보다 얇고 덜 가변)
+    final outline = getStroke(
+      points.map((p) => PointVector(p.dx, p.dy)).toList(),
+      options: StrokeOptions(
+        size: stroke.size * 0.8,
+        thinning: 0.4,
+        smoothing: 0.5,
+        streamline: 0.5,
+        simulatePressure: true,
+      ),
+    );
+    if (outline.isEmpty) return;
+
+    // uniform: uStrokeWidth(0), uColor premultiplied(1~4)
+    shader.setFloat(0, stroke.size);
+    final c = stroke.color;
+    final a = c.a;
+    shader.setFloat(1, c.r * a);
+    shader.setFloat(2, c.g * a);
+    shader.setFloat(3, c.b * a);
+    shader.setFloat(4, a);
+    debugPrint('[pencilShader] fill mode, size=${stroke.size}, a=$a');
+
+    canvas.drawPath(_outlinePath(outline), Paint()
+      ..style = PaintingStyle.fill
+      ..shader = shader);
   }
 
   void _drawEraser(Canvas canvas, Stroke stroke) {
@@ -332,5 +384,6 @@ class _CanvasPainter extends CustomPainter {
   bool shouldRepaint(_CanvasPainter old) =>
       old.elements != elements ||
       old.currentElement != currentElement ||
-      old.backgroundColor != backgroundColor;
+      old.backgroundColor != backgroundColor ||
+      old.pencilShader != pencilShader;
 }
