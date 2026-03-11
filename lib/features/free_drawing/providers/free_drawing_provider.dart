@@ -51,17 +51,26 @@ class FreeDrawingNotifier extends Notifier<FreeDrawingState> {
         );
 
       default:
-        // 무지개 센티넬은 일반 도구에서 사용 불가 → 흰색으로 fallback
-        final strokeColor = state.selectedColor == AppColors.kRainbow
-            ? const Color(0xFFFFFFFF)
-            : state.selectedColor;
-        final stroke = Stroke(
-          points: [point],
-          color: strokeColor,
-          size: state.selectedSize,
-          tool: state.selectedTool,
-        );
-        state = state.copyWith(currentElement: stroke);
+        if (state.selectedColor == AppColors.kRainbow) {
+          // 일반 도구 + 무지개 색 → blur 없는 RainbowStroke (도구 정보 보존)
+          final now = DateTime.now();
+          final stroke = RainbowStroke(
+            points: [point],
+            colors: [rainbowColorAt(0)],
+            size: state.selectedSize,
+            blurSigma: 0.0,
+            tool: state.selectedTool,
+          );
+          state = state.copyWith(currentElement: stroke, strokeStartTime: now);
+        } else {
+          final stroke = Stroke(
+            points: [point],
+            color: state.selectedColor,
+            size: state.selectedSize,
+            tool: state.selectedTool,
+          );
+          state = state.copyWith(currentElement: stroke);
+        }
     }
   }
 
@@ -72,6 +81,9 @@ class FreeDrawingNotifier extends Notifier<FreeDrawingState> {
     switch (state.selectedTool) {
       case DrawingTool.rainbowBrush:
         final stroke = current as RainbowStroke;
+        // 직전 포인트와 너무 가까우면 무시 (시작점 중복 방지)
+        if (stroke.points.isNotEmpty &&
+            (point - stroke.points.last).distance < 2.0) break;
         final elapsedMs = state.strokeStartTime != null
             ? DateTime.now().difference(state.strokeStartTime!).inMilliseconds
             : 0;
@@ -88,21 +100,41 @@ class FreeDrawingNotifier extends Notifier<FreeDrawingState> {
         final last = state.lastSparklePoint;
         if (last == null || (point - last).distance >= _sparkleDistanceThreshold) {
           final newObj = _newSparkleObject(point);
+          final isRainbow = state.selectedColor == AppColors.kRainbow;
+          final nextIndex = isRainbow
+              ? state.sparkleColorIndex + 1
+              : state.sparkleColorIndex;
           state = state.copyWith(
             currentElement: element.copyWith(
               objects: [...element.objects, newObj],
             ),
             lastSparklePoint: point,
+            sparkleColorIndex: nextIndex,
           );
         }
 
       default:
-        final stroke = current as Stroke;
-        state = state.copyWith(
-          currentElement: stroke.copyWith(
-            points: [...stroke.points, point],
-          ),
-        );
+        if (current is RainbowStroke) {
+          // 일반 도구 + 무지개 색 → RainbowStroke 포인트 추가
+          if (current.points.isNotEmpty &&
+              (point - current.points.last).distance < 2.0) break;
+          final elapsedMs = state.strokeStartTime != null
+              ? DateTime.now().difference(state.strokeStartTime!).inMilliseconds
+              : 0;
+          state = state.copyWith(
+            currentElement: current.copyWith(
+              points: [...current.points, point],
+              colors: [...current.colors, rainbowColorAt(elapsedMs)],
+            ),
+          );
+        } else {
+          final stroke = current as Stroke;
+          state = state.copyWith(
+            currentElement: stroke.copyWith(
+              points: [...stroke.points, point],
+            ),
+          );
+        }
     }
   }
 
@@ -170,10 +202,18 @@ class FreeDrawingNotifier extends Notifier<FreeDrawingState> {
 
   // ── 내부 헬퍼 ────────────────────────────────────────────
   SparkleObject _newSparkleObject(Offset position) {
-    final palette = state.sparklePalette;
-    final color = palette.isEmpty
-        ? const Color(0xFFFFD700)
-        : palette[_rng.nextInt(palette.length)];
+    final Color color;
+    if (state.selectedColor == AppColors.kRainbow) {
+      // 3개 오브젝트마다 다음 무지개 색 계열로 이동
+      final hueIdx = (state.sparkleColorIndex ~/ 3) % rainbowColors.length;
+      final subPalette = generateSparklePalette(rainbowColors[hueIdx]);
+      color = subPalette[_rng.nextInt(subPalette.length)];
+    } else {
+      final palette = state.sparklePalette;
+      color = palette.isEmpty
+          ? const Color(0xFFFFD700)
+          : palette[_rng.nextInt(palette.length)];
+    }
     final shape = SparkleShape.values[_rng.nextInt(SparkleShape.values.length)];
     final size = _sparkleMinSize +
         _rng.nextDouble() * (_sparkleMaxSize - _sparkleMinSize);

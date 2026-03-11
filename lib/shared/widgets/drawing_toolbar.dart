@@ -49,10 +49,11 @@ class DrawingToolbar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 색상 팔레트
+            // 색상 팔레트 (무지개 도구 선택 시 비활성화)
             ColorPalette(
               selectedColor: selectedColor,
               onColorSelected: onColorChanged,
+              disabled: selectedTool == DrawingTool.rainbowBrush,
             ),
             const SizedBox(height: 8),
             // 도구 + 크기 + 실행 취소/다시 실행

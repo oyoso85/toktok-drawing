@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart' show HSLColor;
 import 'package:toktok_drawing/shared/models/drawing_element.dart';
+import 'package:toktok_drawing/shared/models/drawing_tool.dart';
 
 class RainbowStroke implements DrawingElement {
   @override
@@ -10,12 +11,14 @@ class RainbowStroke implements DrawingElement {
   final List<Color> colors;
   final double size;
   final double blurSigma;
+  final DrawingTool tool;
 
   const RainbowStroke({
     required this.points,
     required this.colors,
     required this.size,
     required this.blurSigma,
+    this.tool = DrawingTool.pen,
   });
 
   RainbowStroke copyWith({
@@ -23,12 +26,14 @@ class RainbowStroke implements DrawingElement {
     List<Color>? colors,
     double? size,
     double? blurSigma,
+    DrawingTool? tool,
   }) {
     return RainbowStroke(
       points: points ?? this.points,
       colors: colors ?? this.colors,
       size: size ?? this.size,
       blurSigma: blurSigma ?? this.blurSigma,
+      tool: tool ?? this.tool,
     );
   }
 
@@ -40,6 +45,7 @@ class RainbowStroke implements DrawingElement {
       'colors': colors.map((c) => c.toARGB32()).toList(),
       'size': size,
       'blurSigma': blurSigma,
+      'tool': tool.index,
     };
   }
 
@@ -51,6 +57,9 @@ class RainbowStroke implements DrawingElement {
       colors: (json['colors'] as List).map((c) => Color(c as int)).toList(),
       size: (json['size'] as num).toDouble(),
       blurSigma: (json['blurSigma'] as num).toDouble(),
+      tool: json['tool'] != null
+          ? DrawingTool.values[json['tool'] as int]
+          : DrawingTool.pen,
     );
   }
 }

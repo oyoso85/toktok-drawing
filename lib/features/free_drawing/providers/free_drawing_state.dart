@@ -18,9 +18,10 @@ class FreeDrawingState {
   // 무지개 붓: 획 시작 시각 (포인트 색상 계산용)
   final DateTime? strokeStartTime;
 
-  // 꽃씨 붓: 마지막 파티클 생성 위치 + 팔레트
+  // 꽃씨 붓: 마지막 파티클 생성 위치 + 팔레트 + 무지개 순차 색상 인덱스
   final Offset? lastSparklePoint;
   final List<Color> sparklePalette;
+  final int sparkleColorIndex;
 
   const FreeDrawingState({
     required this.elements,
@@ -33,6 +34,7 @@ class FreeDrawingState {
     this.strokeStartTime,
     this.lastSparklePoint,
     required this.sparklePalette,
+    this.sparkleColorIndex = 0,
   });
 
   factory FreeDrawingState.initial() => FreeDrawingState(
@@ -43,6 +45,7 @@ class FreeDrawingState {
         selectedSize: BrushSizeSelector.sizes[1],
         backgroundColor: Colors.white,
         sparklePalette: const [],
+        sparkleColorIndex: 0,
       );
 
   bool get canUndo => elements.isNotEmpty;
@@ -62,6 +65,7 @@ class FreeDrawingState {
     Offset? lastSparklePoint,
     bool clearLastSparklePoint = false,
     List<Color>? sparklePalette,
+    int? sparkleColorIndex,
   }) {
     return FreeDrawingState(
       elements: elements ?? this.elements,
@@ -80,6 +84,7 @@ class FreeDrawingState {
           ? null
           : (lastSparklePoint ?? this.lastSparklePoint),
       sparklePalette: sparklePalette ?? this.sparklePalette,
+      sparkleColorIndex: sparkleColorIndex ?? this.sparkleColorIndex,
     );
   }
 }
