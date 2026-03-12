@@ -1,12 +1,15 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toktok_drawing/features/trace_drawing/models/trace_template.dart';
 import 'package:toktok_drawing/features/trace_drawing/providers/trace_drawing_provider.dart';
+import 'package:toktok_drawing/features/trace_drawing/providers/trace_drawing_state.dart';
 import 'package:toktok_drawing/features/trace_drawing/widgets/template_list_screen.dart';
 import 'package:toktok_drawing/features/trace_drawing/widgets/trace_canvas.dart';
+import 'package:toktok_drawing/shared/models/sparkle_element.dart';
 import 'package:toktok_drawing/shared/widgets/drawing_toolbar.dart';
+import 'package:toktok_drawing/shared/widgets/sparkle_object_widget.dart';
 
-/// 6.1 템플릿 선택 → 6.3~6.6 드로잉 흐름을 관리하는 최상위 화면.
 class TraceDrawingScreen extends ConsumerStatefulWidget {
   const TraceDrawingScreen({super.key});
 
@@ -16,6 +19,23 @@ class TraceDrawingScreen extends ConsumerStatefulWidget {
 
 class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen> {
   TraceTemplate? _selectedTemplate;
+  ui.FragmentProgram? _pencilProgram;
+  final List<SparkleObject> _animatingObjects = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPencilShader();
+  }
+
+  Future<void> _loadPencilShader() async {
+    try {
+      final program = await ui.FragmentProgram.fromAsset('assets/shaders/pencil.frag');
+      if (mounted) setState(() => _pencilProgram = program);
+    } catch (e) {
+      debugPrint('trace pencil shader load FAILED: $e');
+    }
+  }
 
   void _selectTemplate(TraceTemplate tmpl) {
     ref.read(traceDrawingProvider.notifier).resetForTemplate();
@@ -26,7 +46,6 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen> {
     setState(() => _selectedTemplate = null);
   }
 
-  // 6.6 전체 지우기 확인 다이얼로그
   void _confirmClear(BuildContext context) {
     showDialog<void>(
       context: context,
@@ -41,6 +60,7 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen> {
           ElevatedButton(
             onPressed: () {
               ref.read(traceDrawingProvider.notifier).clearStrokes();
+              setState(() => _animatingObjects.clear());
               Navigator.of(ctx).pop();
             },
             child: const Text('지우기'),
@@ -53,19 +73,27 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen> {
   @override
   Widget build(BuildContext context) {
     if (_selectedTemplate == null) {
-      // 6.1 템플릿 목록 화면
       return TemplateListScreen(onSelected: _selectTemplate);
     }
 
-    // 6.3~6.6 드로잉 화면
+    // 꽃씨 붓 새 파티클 감지 → 애니메이션 큐에 추가
+    ref.listen<TraceDrawingState>(traceDrawingProvider, (prev, next) {
+      final prevCurrent = prev?.currentElement;
+      final nextCurrent = next.currentElement;
+      if (nextCurrent is SparkleElement) {
+        final prevCount = prevCurrent is SparkleElement ? prevCurrent.objects.length : 0;
+        final newObjects = nextCurrent.objects.skip(prevCount).toList();
+        if (newObjects.isNotEmpty) {
+          setState(() => _animatingObjects.addAll(newObjects));
+        }
+      }
+    });
+
     final state = ref.watch(traceDrawingProvider);
     final notifier = ref.read(traceDrawingProvider.notifier);
 
     return PopScope(
-      onPopInvokedWithResult: (didPop, _) async {
-        if (!didPop) return;
-        // TODO(task-9): 자동 저장 연동
-      },
+      onPopInvokedWithResult: (didPop, _) async {},
       child: Scaffold(
         appBar: AppBar(
           title: Text(_selectedTemplate!.name),
@@ -75,7 +103,6 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen> {
             onPressed: _backToList,
           ),
           actions: [
-            // 6.6 전체 지우기
             IconButton(
               tooltip: '전체 지우기',
               icon: const Icon(Icons.delete_outline_rounded),
@@ -85,18 +112,29 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen> {
         ),
         body: Column(
           children: [
-            // 6.3+6.4 캔버스
             Expanded(
-              child: TraceCanvas(
-                template: _selectedTemplate!,
-                strokes: state.strokes,
-                currentStroke: state.currentStroke,
-                onPanStart: notifier.startStroke,
-                onPanUpdate: notifier.addPoint,
-                onPanEnd: notifier.endStroke,
+              child: Stack(
+                children: [
+                  TraceCanvas(
+                    template: _selectedTemplate!,
+                    elements: state.elements,
+                    currentElement: state.currentElement,
+                    onPanStart: notifier.startStroke,
+                    onPanUpdate: notifier.addPoint,
+                    onPanEnd: notifier.endStroke,
+                    pencilProgram: _pencilProgram,
+                  ),
+                  // 꽃씨 붓 피어나는 애니메이션 오버레이
+                  ..._animatingObjects.map((obj) => SparkleObjectWidget(
+                        key: ValueKey(identityHashCode(obj)),
+                        object: obj,
+                        onComplete: () {
+                          if (mounted) setState(() => _animatingObjects.remove(obj));
+                        },
+                      )),
+                ],
               ),
             ),
-            // 6.5 색상 + 도구 선택 툴바 (기존 공통 위젯 재사용)
             DrawingToolbar(
               selectedColor: state.selectedColor,
               selectedSize: state.selectedSize,

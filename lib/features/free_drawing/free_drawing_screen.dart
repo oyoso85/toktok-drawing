@@ -20,7 +20,7 @@ class _FreeDrawingScreenState extends ConsumerState<FreeDrawingScreen> {
   final List<SparkleObject> _animatingObjects = [];
 
   // 색연필 Fragment Shader (비동기 로드)
-  ui.FragmentShader? _pencilShader;
+  ui.FragmentProgram? _pencilProgram;
 
   @override
   void initState() {
@@ -34,7 +34,7 @@ class _FreeDrawingScreenState extends ConsumerState<FreeDrawingScreen> {
         'assets/shaders/pencil.frag',
       );
       if (mounted) {
-        setState(() => _pencilShader = program.fragmentShader());
+        setState(() => _pencilProgram = program);
         debugPrint('pencil shader loaded OK');
       }
     } catch (e) {
@@ -143,7 +143,7 @@ class _FreeDrawingScreenState extends ConsumerState<FreeDrawingScreen> {
                     onPanStart: notifier.startStroke,
                     onPanUpdate: notifier.addPoint,
                     onPanEnd: notifier.endStroke,
-                    pencilShader: _pencilShader,
+                    pencilProgram: _pencilProgram,
                   ),
                   // 꽃씨 붓 피어나는 애니메이션 오버레이
                   ..._animatingObjects.map((obj) => SparkleObjectWidget(

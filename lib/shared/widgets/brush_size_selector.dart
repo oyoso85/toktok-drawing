@@ -4,7 +4,7 @@ class BrushSizeSelector extends StatelessWidget {
   final double selectedSize;
   final ValueChanged<double> onSizeSelected;
 
-  static const List<double> sizes = [4.0, 8.0, 16.0, 28.0];
+  static const List<double> sizes = [16.0, 28.0, 44.0, 64.0];
   static const List<String> labels = ['S', 'M', 'L', 'XL'];
 
   const BrushSizeSelector({
@@ -36,8 +36,8 @@ class BrushSizeSelector extends StatelessWidget {
             ),
             child: Center(
               child: Container(
-                width: size.clamp(6.0, 24.0),
-                height: size.clamp(6.0, 24.0),
+                width: size.clamp(10.0, 32.0),
+                height: size.clamp(10.0, 32.0),
                 decoration: const BoxDecoration(
                   color: Colors.black,
                   shape: BoxShape.circle,
