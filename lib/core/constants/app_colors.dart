@@ -22,11 +22,11 @@ class AppColors {
     Color(0x01FFFFFF), // 무지개 (꽃씨 붓용 센티넬)
   ];
 
-  // 모드 카드 배경 색상 (이미지 없을 때 플레이스홀더)
+  // 모드 카드 배경 색상 (이미지 없을 때 플레이스홀더) — 채도 강화
   static const List<Color> modeCardBg = [
-    Color(0xFFFEF3C7), // 자유그리기 - 크림
-    Color(0xFFFFEDD5), // 선따라 - 피치
-    Color(0xFFCCFBF1), // 색칠 - 민트
-    Color(0xFFDBEAFE), // 대칭 - 스카이
+    Color(0xFFFFB74D), // 자유그리기 - 주황
+    Color(0xFF81C784), // 선따라 - 초록
+    Color(0xFF64B5F6), // 색칠 - 파랑
+    Color(0xFFCE93D8), // 대칭 - 보라
   ];
 }

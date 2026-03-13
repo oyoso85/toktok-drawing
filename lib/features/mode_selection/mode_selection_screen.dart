@@ -64,17 +64,17 @@ class _BgCircles extends StatelessWidget {
         Positioned(
           top: -80,
           left: -80,
-          child: _Circle(320, _kPrimary.withValues(alpha: 0.10)),
+          child: _Circle(320, _kPrimary.withValues(alpha: 0.25)),
         ),
         Positioned(
           top: MediaQuery.of(context).size.height / 2,
           right: -80,
-          child: _Circle(240, _kPrimary.withValues(alpha: 0.05)),
+          child: _Circle(240, _kPrimary.withValues(alpha: 0.15)),
         ),
         Positioned(
           bottom: -80,
           left: MediaQuery.of(context).size.width / 4,
-          child: _Circle(380, _kPrimary.withValues(alpha: 0.10)),
+          child: _Circle(380, _kPrimary.withValues(alpha: 0.20)),
         ),
       ],
     );
@@ -257,9 +257,46 @@ class _ScoreBadge extends StatelessWidget {
 
 // ── 본문: 좌(마스코트) + 우(카드 2줄) ──────────────────────────────────────────
 
-class _Body extends StatelessWidget {
+class _Body extends StatefulWidget {
   final void Function(ModeInfo) onTap;
   const _Body({required this.onTap});
+
+  @override
+  State<_Body> createState() => _BodyState();
+}
+
+class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _fadeAnim(int index) => CurvedAnimation(
+        parent: _ctrl,
+        curve: Interval(index * 0.15, (index * 0.15 + 0.6).clamp(0, 1),
+            curve: Curves.easeOut),
+      );
+
+  Animation<Offset> _slideAnim(int index) => Tween<Offset>(
+        begin: const Offset(0, 0.12),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: _ctrl,
+        curve: Interval(index * 0.15, (index * 0.15 + 0.6).clamp(0, 1),
+            curve: Curves.easeOut),
+      ));
 
   @override
   Widget build(BuildContext context) {
@@ -280,9 +317,19 @@ class _Body extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _CardRow(modes: modes.take(2).toList(), onTap: onTap),
+                _CardRow(
+                  modes: modes.take(2).toList(),
+                  onTap: widget.onTap,
+                  fadeAnim: _fadeAnim(0),
+                  slideAnim: _slideAnim(0),
+                ),
                 const SizedBox(height: 14),
-                _CardRow(modes: modes.skip(2).take(2).toList(), onTap: onTap),
+                _CardRow(
+                  modes: modes.skip(2).take(2).toList(),
+                  onTap: widget.onTap,
+                  fadeAnim: _fadeAnim(2),
+                  slideAnim: _slideAnim(2),
+                ),
               ],
             ),
           ),
@@ -376,21 +423,34 @@ class _MascotColumnState extends State<_MascotColumn>
 class _CardRow extends StatelessWidget {
   final List<ModeInfo> modes;
   final void Function(ModeInfo) onTap;
+  final Animation<double> fadeAnim;
+  final Animation<Offset> slideAnim;
 
-  const _CardRow({required this.modes, required this.onTap});
+  const _CardRow({
+    required this.modes,
+    required this.onTap,
+    required this.fadeAnim,
+    required this.slideAnim,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 160,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: modes.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, i) => ModeCard(
-          modeInfo: modes[i],
-          index: i,
-          onTap: () => onTap(modes[i]),
+    return FadeTransition(
+      opacity: fadeAnim,
+      child: SlideTransition(
+        position: slideAnim,
+        child: SizedBox(
+          height: 160,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: modes.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, i) => ModeCard(
+              modeInfo: modes[i],
+              index: i,
+              onTap: () => onTap(modes[i]),
+            ),
+          ),
         ),
       ),
     );

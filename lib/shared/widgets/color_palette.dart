@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:toktok_drawing/core/constants/app_colors.dart';
 import 'package:toktok_drawing/core/utils/palette_utils.dart';
+import 'package:toktok_drawing/shared/widgets/animated_pressable.dart';
 
 class ColorPalette extends StatelessWidget {
   final Color selectedColor;
@@ -23,22 +24,27 @@ class ColorPalette extends StatelessWidget {
       child: IgnorePointer(
         ignoring: disabled,
         child: SizedBox(
-          height: 50,
+          height: 56,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             itemCount: colors.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            separatorBuilder: (_, __) => const SizedBox(width: 6),
             itemBuilder: (context, index) {
               final color = colors[index];
               final isSelected = color == selectedColor;
               final isRainbow = color == AppColors.kRainbow;
+              final glowColor = isRainbow
+                  ? Colors.purple.withValues(alpha: 0.55)
+                  : color.withValues(alpha: 0.55);
 
-              return GestureDetector(
+              return AnimatedPressable(
                 onTap: () => onColorSelected(color),
-                child: Container(
-                  width: 42,
-                  height: 42,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.elasticOut,
+                  width: isSelected ? 50 : 42,
+                  height: isSelected ? 50 : 42,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: isRainbow
@@ -46,16 +52,17 @@ class ColorPalette extends StatelessWidget {
                         : null,
                     color: isRainbow ? null : color,
                     border: Border.all(
-                      color: isSelected ? Colors.blue : Colors.grey.shade300,
-                      width: isSelected ? 3 : 1,
+                      color: isSelected ? Colors.white : Colors.grey.shade300,
+                      width: isSelected ? 3 : 1.5,
                     ),
                     boxShadow: isSelected
-                        ? [BoxShadow(
-                            color: isRainbow
-                                ? Colors.purple.withValues(alpha: 0.5)
-                                : color.withValues(alpha: 0.5),
-                            blurRadius: 6,
-                          )]
+                        ? [
+                            BoxShadow(
+                              color: glowColor,
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            )
+                          ]
                         : null,
                   ),
                 ),

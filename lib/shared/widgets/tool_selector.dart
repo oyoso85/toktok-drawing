@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:toktok_drawing/core/constants/tool_colors.dart';
 import 'package:toktok_drawing/shared/models/drawing_tool.dart';
+import 'package:toktok_drawing/shared/widgets/animated_pressable.dart';
 
 class ToolSelector extends StatelessWidget {
   final DrawingTool selectedTool;
@@ -29,50 +31,58 @@ class ToolSelector extends StatelessWidget {
     DrawingTool.sparkleBrush: '꽃씨',
   };
 
-  static bool _isMagic(DrawingTool tool) =>
-      tool == DrawingTool.rainbowBrush || tool == DrawingTool.sparkleBrush;
-
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: DrawingTool.values.map((tool) {
         final isSelected = tool == selectedTool;
-        final isMagic = _isMagic(tool);
+        final colorSet = ToolColors.of(tool);
+        final isRainbow = tool == DrawingTool.rainbowBrush;
 
-        final selectedBg = isMagic ? Colors.purple.shade100 : Colors.blue.shade100;
-        final selectedBorder = isMagic ? Colors.purple : Colors.blue;
-        final selectedIconColor = isMagic ? Colors.purple : Colors.blue;
-
-        return GestureDetector(
+        return AnimatedPressable(
           onTap: () => onToolSelected(tool),
-          child: Container(
-            width: 48,
-            height: 52,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            width: 52,
+            height: 58,
             margin: const EdgeInsets.symmetric(horizontal: 2),
             decoration: BoxDecoration(
-              color: isSelected ? selectedBg : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isSelected ? selectedBorder : Colors.grey.shade300,
-                width: isSelected ? 2 : 1,
-              ),
+              borderRadius: BorderRadius.circular(14),
+              gradient: isSelected && isRainbow
+                  ? ToolColors.rainbowGradient
+                  : null,
+              color: isSelected && !isRainbow
+                  ? colorSet.active
+                  : !isSelected
+                      ? colorSet.bg
+                      : null,
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: colorSet.glow,
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      )
+                    ]
+                  : null,
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   _toolIcons[tool],
-                  size: 20,
-                  color: isSelected ? selectedIconColor : Colors.grey.shade700,
+                  size: 24,
+                  color: isSelected ? Colors.white : colorSet.active,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   _toolLabels[tool]!,
                   style: TextStyle(
-                    fontSize: 9,
-                    color: isSelected ? selectedIconColor : Colors.grey.shade600,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 11,
+                    color: isSelected ? Colors.white : colorSet.active,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],

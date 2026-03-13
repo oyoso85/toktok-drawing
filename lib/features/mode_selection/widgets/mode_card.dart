@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:toktok_drawing/core/constants/app_colors.dart';
+import 'package:toktok_drawing/shared/widgets/animated_pressable.dart';
 import '../models/mode_info.dart';
 
 const _kPrimary = AppColors.primary;
@@ -103,7 +104,7 @@ class _ModeCardState extends State<ModeCard>
         scale: _scale.value,
         child: Transform.rotate(angle: _rotate.value, child: child),
       ),
-      child: GestureDetector(
+      child: AnimatedPressable(
         onTap: widget.onTap,
         child: Container(
           width: 140,
