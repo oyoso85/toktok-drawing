@@ -5,6 +5,7 @@ import 'package:toktok_drawing/features/free_drawing/free_drawing_screen.dart';
 import 'package:toktok_drawing/features/mode_selection/models/mode_info.dart';
 import 'package:toktok_drawing/features/mode_selection/widgets/mode_card.dart';
 import 'package:toktok_drawing/features/color_by_symbol/color_by_symbol_screen.dart';
+import 'package:toktok_drawing/features/coloring/coloring_screen.dart';
 import 'package:toktok_drawing/features/trace_drawing/trace_drawing_screen.dart';
 import 'package:toktok_drawing/shared/models/drawing_mode.dart';
 
@@ -19,6 +20,7 @@ class ModeSelectionScreen extends StatelessWidget {
         DrawingMode.free => const FreeDrawingScreen(),
         DrawingMode.trace => const TraceDrawingScreen(),
         DrawingMode.colorBySymbol => const ColorBySymbolScreen(),
+        DrawingMode.coloring => const ColoringScreen(),
         _ => PlaceholderDrawingScreen(
             mode: info.mode,
             title: info.title,
@@ -301,6 +303,9 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final modes = ModeInfo.registry;
+    final hasThreeRows = modes.length > 4;
+    final cardHeight = hasThreeRows ? 120.0 : 160.0;
+    final rowGap = hasThreeRows ? 10.0 : 14.0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 0, 12),
       child: Row(
@@ -312,7 +317,7 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
             child: const _MascotColumn(),
           ),
           const SizedBox(width: 16),
-          // 우: 카드 2줄 (가로 스크롤)
+          // 우: 카드 2~3줄 (가로 스크롤)
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -322,14 +327,26 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
                   onTap: widget.onTap,
                   fadeAnim: _fadeAnim(0),
                   slideAnim: _slideAnim(0),
+                  cardHeight: cardHeight,
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: rowGap),
                 _CardRow(
                   modes: modes.skip(2).take(2).toList(),
                   onTap: widget.onTap,
                   fadeAnim: _fadeAnim(2),
                   slideAnim: _slideAnim(2),
+                  cardHeight: cardHeight,
                 ),
+                if (hasThreeRows) ...[
+                  SizedBox(height: rowGap),
+                  _CardRow(
+                    modes: modes.skip(4).toList(),
+                    onTap: widget.onTap,
+                    fadeAnim: _fadeAnim(4),
+                    slideAnim: _slideAnim(4),
+                    cardHeight: cardHeight,
+                  ),
+                ],
               ],
             ),
           ),
@@ -425,12 +442,14 @@ class _CardRow extends StatelessWidget {
   final void Function(ModeInfo) onTap;
   final Animation<double> fadeAnim;
   final Animation<Offset> slideAnim;
+  final double cardHeight;
 
   const _CardRow({
     required this.modes,
     required this.onTap,
     required this.fadeAnim,
     required this.slideAnim,
+    this.cardHeight = 160,
   });
 
   @override
@@ -440,7 +459,7 @@ class _CardRow extends StatelessWidget {
       child: SlideTransition(
         position: slideAnim,
         child: SizedBox(
-          height: 160,
+          height: cardHeight,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: modes.length,

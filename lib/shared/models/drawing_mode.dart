@@ -3,4 +3,5 @@ enum DrawingMode {
   colorBySymbol,
   symmetry,
   free,
+  coloring,
 }

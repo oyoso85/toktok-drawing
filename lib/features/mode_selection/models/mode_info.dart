@@ -61,5 +61,13 @@ class ModeInfo {
       cardColor: Color(0xFFFFD740),
       gradientIndex: 3,
     ),
+    ModeInfo(
+      mode: DrawingMode.coloring,
+      title: '색칠하기',
+      description: '마법처럼 색칠해요!',
+      icon: Icons.palette_rounded,
+      cardColor: Color(0xFFFF7EB3),
+      gradientIndex: 4,
+    ),
   ];
 }
