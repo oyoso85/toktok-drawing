@@ -18,8 +18,12 @@ class ColoringCanvas extends ConsumerStatefulWidget {
 }
 
 class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _animController;
+
+  /// 미채움 단면 힌트: 0→10%→0 opacity, 1.5초 왕복 (3초 주기)
+  late AnimationController _hintController;
+
   FillAnimationPainter? _activePainter;
   ui.Path? _animTargetPath;
   Color? _animFillColor;
@@ -31,14 +35,21 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
+    _animController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900))
       ..addListener(_onAnimationTick)
       ..addStatusListener(_onAnimationStatus);
+
+    _hintController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1500))
+      ..addListener(_onAnimationTick)
+      ..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _animController.dispose();
+    _hintController.dispose();
     super.dispose();
   }
 
@@ -47,8 +58,10 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
   void _onAnimationStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
       // 애니메이션 완료 → path를 filled로 전환
-      if (_animatingPathIndex != null) {
-        ref.read(coloringProvider.notifier).fillPath(_animatingPathIndex!);
+      if (_animatingPathIndex != null && _animFillColor != null) {
+        ref
+            .read(coloringProvider.notifier)
+            .fillPath(_animatingPathIndex!, _animFillColor!);
       }
       ref.read(coloringProvider.notifier).setAnimating(false);
       setState(() {
@@ -72,11 +85,15 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
     // SVG 좌표계로 역변환
     final svgOffset = _transform!.toSvgOffset(canvasOffset);
 
+    // 선택된 색이 없으면 탭 무시
+    final selectedColor = state.selectedColor;
+    if (selectedColor == null) return;
+
     // Hit detection: 소형/흰색/이미 채워진 path 제외, 역순(z-order 상위 우선)
     ColoringPath? hit;
     for (final cp in state.parsedPaths.reversed) {
       if (!cp.isInteractive) continue;
-      if (state.filledPaths.contains(cp.index)) continue;
+      if (state.filledPaths.containsKey(cp.index)) continue;
       if (!cp.bounds.contains(svgOffset)) continue;
       if (cp.path.contains(svgOffset)) {
         hit = cp;
@@ -86,10 +103,13 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
 
     if (hit == null) return;
 
-    // 효과 선택 및 애니메이션 시작
+    // 선택한 색이 해당 단면의 원본 색과 다르면 채우지 않음
+    if (selectedColor != hit.fillColor) return;
+
+    // 효과 선택 및 애니메이션 시작 (선택한 색상 사용)
     final painter = FillAnimationSelector.select(
       bounds: hit.bounds,
-      fillColor: hit.fillColor,
+      fillColor: selectedColor,
       tapOffset: svgOffset,
       pencilProgram: widget.pencilProgram,
     );
@@ -102,7 +122,7 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
     setState(() {
       _activePainter = painter;
       _animTargetPath = hit!.path;
-      _animFillColor = hit.fillColor;
+      _animFillColor = selectedColor;
       _animTapOffset = svgOffset;
       _animatingPathIndex = hit.index;
     });
@@ -131,6 +151,7 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
               painter: ColoringPainter(
                 paths: state.parsedPaths,
                 filledPaths: state.filledPaths,
+                hintOpacity: _hintController.value * 0.25,
                 activeAnimation: _activePainter,
                 animationTargetPath: _animTargetPath,
                 animationFillColor: _animFillColor,

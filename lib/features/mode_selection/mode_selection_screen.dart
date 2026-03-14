@@ -5,7 +5,7 @@ import 'package:toktok_drawing/features/free_drawing/free_drawing_screen.dart';
 import 'package:toktok_drawing/features/mode_selection/models/mode_info.dart';
 import 'package:toktok_drawing/features/mode_selection/widgets/mode_card.dart';
 import 'package:toktok_drawing/features/color_by_symbol/color_by_symbol_screen.dart';
-import 'package:toktok_drawing/features/coloring/coloring_screen.dart';
+import 'package:toktok_drawing/features/coloring/coloring_select_screen.dart';
 import 'package:toktok_drawing/features/trace_drawing/trace_drawing_screen.dart';
 import 'package:toktok_drawing/shared/models/drawing_mode.dart';
 
@@ -20,7 +20,7 @@ class ModeSelectionScreen extends StatelessWidget {
         DrawingMode.free => const FreeDrawingScreen(),
         DrawingMode.trace => const TraceDrawingScreen(),
         DrawingMode.colorBySymbol => const ColorBySymbolScreen(),
-        DrawingMode.coloring => const ColoringScreen(),
+        DrawingMode.coloring => const ColoringSelectScreen(),
         _ => PlaceholderDrawingScreen(
             mode: info.mode,
             title: info.title,

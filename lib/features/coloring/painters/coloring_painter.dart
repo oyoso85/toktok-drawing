@@ -5,13 +5,17 @@ import 'package:toktok_drawing/features/coloring/animations/fill_animation_paint
 import 'package:toktok_drawing/features/coloring/models/coloring_path.dart';
 
 /// 색칠 캔버스 CustomPainter.
-/// - 미채움 인터랙티브 path: 흰색 fill + 검정 stroke
-/// - 채워진 path: SVG 원본 fill 색상
+/// - 미채움 인터랙티브 path: 흰색 fill + 검정 stroke + hintOpacity 힌트 색상
+/// - 채워진 path: 사용자가 선택한 색상 (filledPaths[index])
 /// - 소형/흰색 path: SVG 원본 fill 색상 (항상)
 /// - 진행 중 애니메이션: targetPath 위에 클리핑되어 렌더
 class ColoringPainter extends CustomPainter {
   final List<ColoringPath> paths;
-  final Set<int> filledPaths;
+  final Map<int, Color> filledPaths;
+
+  /// 미채움 단면에 원본 색을 얼마나 비쳐 보이게 할지 (0.0 ~ 0.10).
+  final double hintOpacity;
+
   final FillAnimationPainter? activeAnimation;
   final ui.Path? animationTargetPath;
   final Color? animationFillColor;
@@ -22,6 +26,7 @@ class ColoringPainter extends CustomPainter {
   const ColoringPainter({
     required this.paths,
     required this.filledPaths,
+    this.hintOpacity = 0.0,
     this.activeAnimation,
     this.animationTargetPath,
     this.animationFillColor,
@@ -47,23 +52,33 @@ class ColoringPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     for (final cp in paths) {
-      if (!cp.isInteractive) {
-        // 소형/흰색 path: 처음부터 원본 색상으로 표시
+      // isWhite(배경/윤곽선) path만 원본 색 유지, isTiny는 흰색+선으로 처리
+      if (cp.isWhite) {
         canvas.drawPath(cp.path, Paint()
           ..color = cp.fillColor
           ..style = PaintingStyle.fill);
         continue;
       }
 
-      if (filledPaths.contains(cp.index)) {
-        // 채워진 path: solid fill
+      final filledColor = filledPaths[cp.index];
+      if (filledColor != null) {
+        // 채워진 path: 사용자가 선택한 색상
         canvas.drawPath(cp.path, Paint()
-          ..color = cp.fillColor
+          ..color = filledColor
           ..style = PaintingStyle.fill);
         canvas.drawPath(cp.path, strokePaint);
       } else {
-        // 미채움: 흰색 fill + 검정 테두리
+        // 미채움 (interactive 여부 무관): 흰색 fill + 검정 테두리
         canvas.drawPath(cp.path, whitePaint);
+        // 힌트는 interactive 단면에만 표시
+        if (cp.isInteractive && hintOpacity > 0.0) {
+          canvas.drawPath(
+            cp.path,
+            Paint()
+              ..color = cp.fillColor.withValues(alpha: hintOpacity)
+              ..style = PaintingStyle.fill,
+          );
+        }
         canvas.drawPath(cp.path, strokePaint);
       }
     }
@@ -91,6 +106,7 @@ class ColoringPainter extends CustomPainter {
   @override
   bool shouldRepaint(ColoringPainter old) =>
       old.filledPaths != filledPaths ||
+      old.hintOpacity != hintOpacity ||
       old.animationT != animationT ||
       old.activeAnimation != activeAnimation;
 }

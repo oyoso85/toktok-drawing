@@ -33,7 +33,7 @@ flutter:
   assets:
     - assets/images/
     - assets/templates/trace/
-    - assets/templates/coloring/
+    - assets/templates/coloring/character/
     - assets/brushes/
 
   shaders:
