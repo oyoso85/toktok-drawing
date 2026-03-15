@@ -13,6 +13,7 @@ class ColoringNotifier extends Notifier<ColoringState> {
   Future<void> initPaths(String svgAssetPath) async {
     final svgString = await rootBundle.loadString(svgAssetPath);
     final paths = SvgColoringParser.parse(svgString);
+    final viewBox = SvgColoringParser.parseViewBox(svgString);
 
     final firstColor = paths
         .where((p) => p.isInteractive)
@@ -25,6 +26,7 @@ class ColoringNotifier extends Notifier<ColoringState> {
       filledPaths: {},
       isCompleted: false,
       selectedColor: firstColor,
+      svgViewBox: viewBox,
     );
   }
 

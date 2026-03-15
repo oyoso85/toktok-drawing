@@ -3,21 +3,25 @@ import 'dart:typed_data';
 import 'dart:ui';
 import 'package:vector_math/vector_math_64.dart';
 
-/// character.svg viewBox(630x648)를 캔버스 크기에 맞게
-/// uniform scale + center 정렬하는 변환 행렬을 계산한다.
+/// SVG viewBox를 캔버스 크기에 맞게 uniform scale + center 정렬하는 변환 행렬을 계산한다.
 class ColoringTransform {
-  static const double svgWidth = 630.0;
-  static const double svgHeight = 648.0;
-
   final Matrix4 matrix;
   final Matrix4 _inverse;
 
   ColoringTransform._(this.matrix) : _inverse = Matrix4.copy(matrix)..invert();
 
-  factory ColoringTransform.forCanvas(Size canvasSize) {
+  static const double padding = 24.0;
+
+  factory ColoringTransform.forCanvas(Size canvasSize, {Size svgViewBox = const Size(630, 648)}) {
+    final svgWidth = svgViewBox.width;
+    final svgHeight = svgViewBox.height;
+    final available = Size(
+      canvasSize.width - padding * 2,
+      canvasSize.height - padding * 2,
+    );
     final scale = min(
-      canvasSize.width / svgWidth,
-      canvasSize.height / svgHeight,
+      available.width / svgWidth,
+      available.height / svgHeight,
     );
     final dx = (canvasSize.width - svgWidth * scale) / 2;
     final dy = (canvasSize.height - svgHeight * scale) / 2;

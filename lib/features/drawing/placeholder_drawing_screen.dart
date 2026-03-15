@@ -29,6 +29,8 @@ class PlaceholderDrawingScreen extends StatelessWidget {
       },
       child: Scaffold(
         appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
           title: Text(title),
           centerTitle: true,
         ),

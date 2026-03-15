@@ -52,8 +52,8 @@ class ColoringPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     for (final cp in paths) {
-      // isWhite(배경/윤곽선) path만 원본 색 유지, isTiny는 흰색+선으로 처리
-      if (cp.isWhite) {
+      // 흰색·검정 면: 처음부터 원본 색으로 채워진 상태 (탭 불가)
+      if (cp.isWhite || cp.isBlack) {
         canvas.drawPath(cp.path, Paint()
           ..color = cp.fillColor
           ..style = PaintingStyle.fill);
@@ -68,9 +68,8 @@ class ColoringPainter extends CustomPainter {
           ..style = PaintingStyle.fill);
         canvas.drawPath(cp.path, strokePaint);
       } else {
-        // 미채움 (interactive 여부 무관): 흰색 fill + 검정 테두리
+        // 미채움 interactive path: 흰색 fill + 검정 테두리
         canvas.drawPath(cp.path, whitePaint);
-        // 힌트는 interactive 단면에만 표시
         if (cp.isInteractive && hintOpacity > 0.0) {
           canvas.drawPath(
             cp.path,

@@ -32,6 +32,7 @@ class ColoringThumbnailPainter extends CustomPainter {
 
     for (final cp in paths) {
       if (!cp.isInteractive) {
+        // 흰색·검정 면(및 tiny): 원본 색으로 채워진 상태로 표시
         canvas.drawPath(
           cp.path,
           Paint()

@@ -31,6 +31,7 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
   int? _animatingPathIndex;
   ColoringTransform? _transform;
   Size? _lastCanvasSize;
+  Size? _lastSvgViewBox;
 
   @override
   void initState() {
@@ -138,10 +139,14 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
       builder: (context, constraints) {
         final canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
 
-        // 캔버스 크기 변경 시 transform 갱신
-        if (_lastCanvasSize != canvasSize) {
+        // 캔버스 크기 또는 SVG viewBox 변경 시 transform 갱신
+        if (_lastCanvasSize != canvasSize || _lastSvgViewBox != state.svgViewBox) {
           _lastCanvasSize = canvasSize;
-          _transform = ColoringTransform.forCanvas(canvasSize);
+          _lastSvgViewBox = state.svgViewBox;
+          _transform = ColoringTransform.forCanvas(
+            canvasSize,
+            svgViewBox: state.svgViewBox,
+          );
         }
 
         return GestureDetector(

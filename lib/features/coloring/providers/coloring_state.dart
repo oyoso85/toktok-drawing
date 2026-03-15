@@ -13,12 +13,16 @@ class ColoringState {
   /// 현재 사용자가 선택한 팔레트 색상
   final Color? selectedColor;
 
+  /// SVG viewBox 크기 (변환 행렬 계산에 사용)
+  final Size svgViewBox;
+
   const ColoringState({
     required this.parsedPaths,
     required this.filledPaths,
     required this.isAnimating,
     required this.isCompleted,
     this.selectedColor,
+    this.svgViewBox = const Size(630, 648),
   });
 
   factory ColoringState.initial() => const ColoringState(
@@ -46,6 +50,7 @@ class ColoringState {
     bool? isAnimating,
     bool? isCompleted,
     Color? selectedColor,
+    Size? svgViewBox,
   }) {
     return ColoringState(
       parsedPaths: parsedPaths ?? this.parsedPaths,
@@ -53,6 +58,7 @@ class ColoringState {
       isAnimating: isAnimating ?? this.isAnimating,
       isCompleted: isCompleted ?? this.isCompleted,
       selectedColor: selectedColor ?? this.selectedColor,
+      svgViewBox: svgViewBox ?? this.svgViewBox,
     );
   }
 }

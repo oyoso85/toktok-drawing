@@ -107,6 +107,8 @@ class _FreeDrawingScreenState extends ConsumerState<FreeDrawingScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
           title: const Text('자유 그리기'),
           centerTitle: true,
           actions: [

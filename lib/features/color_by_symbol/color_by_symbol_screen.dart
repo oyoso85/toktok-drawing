@@ -83,6 +83,8 @@ class _ColorBySymbolScreenState extends ConsumerState<ColorBySymbolScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: Text(_selectedTemplate!.name),
         centerTitle: true,
         leading: IconButton(

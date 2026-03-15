@@ -13,8 +13,13 @@ class ColoringSelectScreen extends StatelessWidget {
   const ColoringSelectScreen({super.key});
 
   void _openTemplate(BuildContext context, SvgTemplate template) {
+    final index = kSvgTemplates.indexOf(template);
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ColoringScreen(svgAssetPath: template.assetPath),
+      builder: (_) => ColoringScreen(
+        svgAssetPath: template.assetPath,
+        allTemplates: kSvgTemplates,
+        templateIndex: index,
+      ),
     ));
   }
 
@@ -32,7 +37,7 @@ class ColoringSelectScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_rounded,
@@ -155,6 +160,7 @@ class _SvgThumbnail extends StatefulWidget {
 
 class _SvgThumbnailState extends State<_SvgThumbnail> {
   List<ColoringPath>? _paths;
+  Size _svgViewBox = const Size(630, 648);
 
   @override
   void initState() {
@@ -165,7 +171,13 @@ class _SvgThumbnailState extends State<_SvgThumbnail> {
   Future<void> _loadPaths() async {
     final svgString = await rootBundle.loadString(widget.assetPath);
     final paths = SvgColoringParser.parse(svgString);
-    if (mounted) setState(() => _paths = paths);
+    final viewBox = SvgColoringParser.parseViewBox(svgString);
+    if (mounted) {
+      setState(() {
+        _paths = paths;
+        _svgViewBox = viewBox;
+      });
+    }
   }
 
   @override
@@ -177,6 +189,7 @@ class _SvgThumbnailState extends State<_SvgThumbnail> {
       builder: (context, constraints) {
         final transform = ColoringTransform.forCanvas(
           Size(constraints.maxWidth, constraints.maxHeight),
+          svgViewBox: _svgViewBox,
         );
         return CustomPaint(
           painter: ColoringThumbnailPainter(

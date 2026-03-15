@@ -11,6 +11,8 @@ class ColoringTemplateListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text('숫자로 색칠하기'),
         centerTitle: true,
       ),

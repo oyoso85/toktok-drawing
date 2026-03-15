@@ -18,18 +18,18 @@
 
 ---
 
-## Illustrator 저장 설정
+## Illustrator 저장 설정 (CS6 기준)
 
-`File > Export > Export As...` → 형식: **SVG**
+`File > Save As...` → 형식: **SVG** → Save → SVG Options 대화상자
 
-| 옵션 | 설정값 | 이유 |
-|------|--------|------|
-| **Styling** | **Presentation Attributes** | `fill="#e6a032"` 형식으로 export (필수) |
-| Decimal Places | 1~2 | 파일 크기 최적화 |
-| Minify | 체크 안 함 | 디버그 편의 |
-| Responsive | 체크 안 함 | viewBox 고정 필요 |
+| 옵션 | 위치 | 설정값 |
+|------|------|--------|
+| **CSS Properties** | Advanced Options | **Presentation Attributes** ← 가장 중요 |
+| Decimal Places | Advanced Options | 1~2 (현재 3도 무방) |
+| SVG Profiles | 상단 | SVG 1.1 |
+| Fonts > Type | - | Adobe CEF (기본값 유지) |
 
-> **Styling이 가장 중요하다.** `Internal CSS`나 `Inline Style`로 저장하면
+> **CSS Properties가 가장 중요하다.** `Style Attributes`나 `Style Elements`로 저장하면
 > `<path style="fill:#e6a032">` 형식이 되어 파서가 색상을 읽지 못한다.
 
 ---

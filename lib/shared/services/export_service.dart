@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
 
 class ExportService {
   /// RenderRepaintBoundary에서 PNG 바이트를 추출
@@ -11,13 +10,8 @@ class ExportService {
     return byteData?.buffer.asUint8List();
   }
 
-  /// PNG 바이트를 기기 갤러리에 저장
+  /// TODO: 갤러리 저장 미구현 (image_gallery_saver 호환성 문제로 임시 제거)
   Future<bool> saveToGallery(Uint8List pngBytes, {String name = 'toktok_drawing'}) async {
-    final result = await ImageGallerySaver.saveImage(
-      pngBytes,
-      name: '${name}_${DateTime.now().millisecondsSinceEpoch}',
-      quality: 100,
-    );
-    return result['isSuccess'] == true;
+    return false;
   }
 }

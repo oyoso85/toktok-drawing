@@ -12,6 +12,31 @@ import 'coloring_path.dart';
 ///   - Internal CSS            : <style>.cls-1{fill:#e6a032}</style>
 ///   - rgb() 색상              : fill="rgb(230,160,50)"
 class SvgColoringParser {
+  /// SVG 루트 요소의 viewBox 크기를 반환.
+  /// viewBox 속성이 없으면 width/height 속성을 사용하고, 그것도 없으면 (630, 648) 기본값 반환.
+  static Size parseViewBox(String svgString) {
+    final document = XmlDocument.parse(svgString);
+    final svg = document.findElements('svg').firstOrNull;
+    if (svg == null) return const Size(630, 648);
+
+    final viewBox = svg.getAttribute('viewBox');
+    if (viewBox != null) {
+      final parts = viewBox.trim().split(RegExp(r'[\s,]+'));
+      if (parts.length == 4) {
+        final w = double.tryParse(parts[2]);
+        final h = double.tryParse(parts[3]);
+        if (w != null && h != null && w > 0 && h > 0) return Size(w, h);
+      }
+    }
+
+    final w = double.tryParse(
+        (svg.getAttribute('width') ?? '').replaceAll(RegExp(r'[^\d.]'), ''));
+    final h = double.tryParse(
+        (svg.getAttribute('height') ?? '').replaceAll(RegExp(r'[^\d.]'), ''));
+    if (w != null && h != null && w > 0 && h > 0) return Size(w, h);
+
+    return const Size(630, 648);
+  }
   static const double _tinyAreaThreshold = 400.0;  // 면적 기준: 20×20 px²
 
   /// [svgString]에서 모든 path 요소를 파싱하여 반환.
@@ -50,6 +75,7 @@ class SvgColoringParser {
       final area = effectiveBounds.width * effectiveBounds.height;
       final isTiny = area < _tinyAreaThreshold;
       final isWhite = color != null && _isNearWhite(color);
+      final isBlack = color != null && _isNearBlack(color);
 
       result.add(ColoringPath(
         index: index,
@@ -58,6 +84,7 @@ class SvgColoringParser {
         bounds: effectiveBounds,
         isTiny: isTiny,
         isWhite: isWhite,
+        isBlack: isBlack,
       ));
       index++;
     }
@@ -171,6 +198,10 @@ class SvgColoringParser {
 
   static bool _isNearWhite(Color color) {
     return color.r > 0.99 && color.g > 0.99 && color.b > 0.99;
+  }
+
+  static bool _isNearBlack(Color color) {
+    return color.r < 0.15 && color.g < 0.15 && color.b < 0.15;
   }
 
   // ── Path 파싱 ──────────────────────────────────────────────────────────────
