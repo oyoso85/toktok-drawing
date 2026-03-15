@@ -1,112 +1,136 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:toktok_drawing/core/constants/app_colors.dart';
 import 'package:toktok_drawing/features/trace_drawing/models/trace_template.dart';
 
-/// 6.1 가이드 선 템플릿 목록 화면.
-/// 탭 시 [onSelected] 콜백으로 선택된 템플릿을 반환.
+/// 선 따라 그리기 도안 선택 화면.
+/// ColoringSelectScreen과 동일한 마운트 카드 스타일 (150×150, 2행 가로 스크롤).
 class TemplateListScreen extends StatelessWidget {
+  final List<TraceTemplate> templates;
   final void Function(TraceTemplate) onSelected;
 
-  const TemplateListScreen({super.key, required this.onSelected});
+  const TemplateListScreen({
+    super.key,
+    required this.templates,
+    required this.onSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final row1 = [for (int i = 0; i < templates.length; i += 2) templates[i]];
+    final row2 = [for (int i = 1; i < templates.length; i += 2) templates[i]];
+
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('선 따라 그리기'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_rounded, color: AppColors.primary),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          '선 따라 그리기',
+          style: TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+          ),
+        ),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '따라 그릴 선을 골라봐요! ✏️',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 1.1,
-                ),
-                itemCount: TraceTemplate.registry.length,
-                itemBuilder: (context, i) {
-                  final tmpl = TraceTemplate.registry[i];
-                  return _TemplateCard(
-                    template: tmpl,
-                    onTap: () => onSelected(tmpl),
-                  );
-                },
-              ),
-            ),
-          ],
+      body: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TemplateRow(templates: row1, onTap: onSelected),
+              const SizedBox(height: 12),
+              _TemplateRow(templates: row2, onTap: onSelected),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _TemplateCard extends StatelessWidget {
+class _TemplateRow extends StatelessWidget {
+  final List<TraceTemplate> templates;
+  final void Function(TraceTemplate) onTap;
+
+  const _TemplateRow({required this.templates, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    if (templates.isEmpty) return const SizedBox(width: _TraceTemplateCard.size);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (int i = 0; i < templates.length; i++) ...[
+          if (i > 0) const SizedBox(width: 12),
+          _TraceTemplateCard(template: templates[i], onTap: () => onTap(templates[i])),
+        ],
+      ],
+    );
+  }
+}
+
+class _TraceTemplateCard extends StatelessWidget {
+  static const double size = 150.0;
+  static const double padding = 16.0;
+
   final TraceTemplate template;
   final VoidCallback onTap;
 
-  const _TemplateCard({required this.template, required this.onTap});
+  const _TraceTemplateCard({required this.template, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: template.thumbnailColor.withValues(alpha: 0.3),
-              offset: const Offset(0, 6),
-              blurRadius: 0,
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              offset: const Offset(0, 3),
+              color: Colors.black.withValues(alpha: 0.10),
               blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
-          border: Border.all(color: Colors.white, width: 3),
         ),
-        clipBehavior: Clip.antiAlias,
+        padding: const EdgeInsets.all(padding),
         child: Column(
           children: [
-            // 썸네일 미리보기
             Expanded(
-              child: Container(
-                color: template.thumbnailColor.withValues(alpha: 0.12),
-                child: CustomPaint(
-                  painter: _TemplateThumbnailPainter(template),
-                  child: const SizedBox.expand(),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: ColoredBox(
+                  color: template.thumbnailColor.withValues(alpha: 0.10),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: SvgPicture.asset(
+                      template.svgAsset,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ),
               ),
             ),
-            // 이름
-            Container(
-              width: double.infinity,
-              color: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text(
-                template.name,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1E293B),
-                ),
-                textAlign: TextAlign.center,
+            const SizedBox(height: 6),
+            Text(
+              template.name,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF1E293B),
               ),
             ),
           ],
@@ -116,46 +140,3 @@ class _TemplateCard extends StatelessWidget {
   }
 }
 
-/// 템플릿 카드 썸네일 미리보기 Painter.
-class _TemplateThumbnailPainter extends CustomPainter {
-  final TraceTemplate template;
-  const _TemplateThumbnailPainter(this.template);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = template.pathBuilder(size);
-    final paint = Paint()
-      ..color = template.thumbnailColor
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    // 점선 미리보기
-    _drawDashed(canvas, path, paint);
-  }
-
-  void _drawDashed(Canvas canvas, Path path, Paint paint) {
-    const dash = 10.0;
-    const gap = 6.0;
-    final metrics = path.computeMetrics();
-    for (final metric in metrics) {
-      double d = 0;
-      bool draw = true;
-      while (d < metric.length) {
-        final len = draw ? dash : gap;
-        if (draw) {
-          canvas.drawPath(
-            metric.extractPath(d, (d + len).clamp(0, metric.length)),
-            paint,
-          );
-        }
-        d += len;
-        draw = !draw;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_TemplateThumbnailPainter old) =>
-      old.template != template;
-}

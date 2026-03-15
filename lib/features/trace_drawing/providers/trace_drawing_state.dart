@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:toktok_drawing/core/constants/app_colors.dart';
+import 'package:toktok_drawing/features/trace_drawing/models/trace_hitzone.dart';
 import 'package:toktok_drawing/shared/models/drawing_element.dart';
 import 'package:toktok_drawing/shared/models/drawing_tool.dart';
 import 'package:toktok_drawing/shared/widgets/brush_size_selector.dart';
@@ -21,6 +22,12 @@ class TraceDrawingState {
   final int sparkleColorIndex;
   final List<Color> sparklePalette;
 
+  // 히트존 & 완성 상태
+  final HitZone? hitZone;
+  final bool isCompleted;
+  /// hitZone 내부 커버리지 변경 시 repaint 트리거용 카운터.
+  final int coverageVersion;
+
   const TraceDrawingState({
     required this.elements,
     required this.redoStack,
@@ -32,12 +39,15 @@ class TraceDrawingState {
     this.lastSparklePoint,
     this.sparkleColorIndex = 0,
     this.sparklePalette = const [],
+    this.hitZone,
+    this.isCompleted = false,
+    this.coverageVersion = 0,
   });
 
   factory TraceDrawingState.initial() => TraceDrawingState(
         elements: const [],
         redoStack: const [],
-        selectedColor: AppColors.palette.first,
+        selectedColor: AppColors.kRainbow,
         selectedTool: DrawingTool.pen,
         selectedSize: BrushSizeSelector.sizes[1],
       );
@@ -59,6 +69,9 @@ class TraceDrawingState {
     bool clearLastSparklePoint = false,
     int? sparkleColorIndex,
     List<Color>? sparklePalette,
+    HitZone? hitZone,
+    bool? isCompleted,
+    int? coverageVersion,
   }) {
     return TraceDrawingState(
       elements: elements ?? this.elements,
@@ -71,6 +84,9 @@ class TraceDrawingState {
       lastSparklePoint: clearLastSparklePoint ? null : (lastSparklePoint ?? this.lastSparklePoint),
       sparkleColorIndex: sparkleColorIndex ?? this.sparkleColorIndex,
       sparklePalette: sparklePalette ?? this.sparklePalette,
+      hitZone: hitZone ?? this.hitZone,
+      isCompleted: isCompleted ?? this.isCompleted,
+      coverageVersion: coverageVersion ?? this.coverageVersion,
     );
   }
 }

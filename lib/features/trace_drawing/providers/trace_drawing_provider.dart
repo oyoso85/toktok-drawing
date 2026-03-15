@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toktok_drawing/core/constants/app_colors.dart';
 import 'package:toktok_drawing/core/utils/palette_utils.dart';
+import 'package:toktok_drawing/features/trace_drawing/models/trace_hitzone.dart';
+import 'package:toktok_drawing/features/trace_drawing/models/trace_template.dart';
 import 'package:toktok_drawing/shared/models/drawing_tool.dart';
 import 'package:toktok_drawing/shared/models/rainbow_stroke.dart';
 import 'package:toktok_drawing/shared/models/sparkle_element.dart';
@@ -12,8 +14,9 @@ import 'trace_drawing_state.dart';
 const _sparkleDistanceThreshold = 20.0;
 const _sparkleMinSize = 16.0;
 const _sparkleMaxSize = 36.0;
+const _completionThreshold = 0.9;
 
-/// 6.7 선 따라 그리기 Riverpod Provider.
+/// 선 따라 그리기 Riverpod Provider.
 /// 가이드 선은 상태에 포함되지 않음 — 가이드 선은 TraceTemplate에서 빌드.
 class TraceDrawingNotifier extends Notifier<TraceDrawingState> {
   final _rng = Random();
@@ -23,6 +26,8 @@ class TraceDrawingNotifier extends Notifier<TraceDrawingState> {
 
   // ── 스트로크 제스처 ─────────────────────────────────────
   void startStroke(Offset point) {
+    if (state.isCompleted) return;
+
     state = state.copyWith(redoStack: []);
 
     switch (state.selectedTool) {
@@ -67,9 +72,12 @@ class TraceDrawingNotifier extends Notifier<TraceDrawingState> {
           state = state.copyWith(currentElement: stroke);
         }
     }
+    _updateCoverage(point);
   }
 
   void addPoint(Offset point) {
+    if (state.isCompleted) return;
+
     final current = state.currentElement;
     if (current == null) return;
 
@@ -121,9 +129,11 @@ class TraceDrawingNotifier extends Notifier<TraceDrawingState> {
           );
         }
     }
+    _updateCoverage(point);
   }
 
   void endStroke() {
+    if (state.isCompleted) return;
     final current = state.currentElement;
     if (current == null) return;
     state = state.copyWith(
@@ -132,9 +142,10 @@ class TraceDrawingNotifier extends Notifier<TraceDrawingState> {
       clearStrokeStartTime: true,
       clearLastSparklePoint: true,
     );
+    _checkCompletion();
   }
 
-  // ── 6.6 실행 취소 / 다시 실행 ────────────────────────────
+  // ── 실행 취소 / 다시 실행 ────────────────────────────
   void undo() {
     if (!state.canUndo) return;
     final last = state.elements.last;
@@ -153,8 +164,9 @@ class TraceDrawingNotifier extends Notifier<TraceDrawingState> {
     );
   }
 
-  /// 6.6 전체 지우기: 사용자 스트로크만 제거, 가이드 선은 유지.
+  /// 전체 지우기: 사용자 스트로크 + 커버리지 초기화.
   void clearStrokes() {
+    state.hitZone?.reset();
     state = state.copyWith(
       elements: [],
       redoStack: [],
@@ -179,9 +191,35 @@ class TraceDrawingNotifier extends Notifier<TraceDrawingState> {
 
   void changeSize(double size) => state = state.copyWith(selectedSize: size);
 
-  /// 새 템플릿 선택 시 이전 스트로크 초기화.
-  void resetForTemplate() {
-    state = TraceDrawingState.initial();
+  /// 새 도안 + 캔버스 크기로 히트존 생성 및 상태 초기화.
+  void resetForTemplate(TraceTemplate template, Size canvasSize) {
+    final path = template.pathBuilder(canvasSize);
+    const hitRadius = 24.0; // 도구 굵기와 무관하게 고정
+    final hitZone = HitZone.fromPath(path, hitRadius);
+    state = TraceDrawingState.initial().copyWith(
+      hitZone: hitZone,
+      selectedColor: state.selectedColor,
+      selectedSize: state.selectedSize,
+      selectedTool: state.selectedTool,
+    );
+  }
+
+  // ── 커버리지 업데이트 ──────────────────────────────────
+  void _updateCoverage(Offset point) {
+    final hz = state.hitZone;
+    if (hz == null || state.isCompleted) return;
+    final changed = hz.coverNear(point);
+    if (changed.isNotEmpty) {
+      state = state.copyWith(coverageVersion: state.coverageVersion + 1);
+    }
+  }
+
+  void _checkCompletion() {
+    final hz = state.hitZone;
+    if (hz == null || state.isCompleted) return;
+    if (hz.coverage >= _completionThreshold) {
+      state = state.copyWith(isCompleted: true);
+    }
   }
 
   // ── 내부 헬퍼 ────────────────────────────────────────────
