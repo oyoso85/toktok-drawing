@@ -9,7 +9,8 @@ import 'package:toktok_drawing/shared/painters/stroke_painter_mixin.dart';
 /// 가이드 선 + 히트존 + 사용자 스트로크 캔버스.
 /// [illustrationOpacity] : 배경 컬러 일러스트 투명도 (0.0~1.0, 기본 0.1)
 /// [strokesOpacity]      : 가이드/히트존/스트로크 투명도 (0.0~1.0, 기본 1.0)
-class TraceCanvas extends StatelessWidget {
+/// 두 손가락 핀치로 최대 2배까지 확대/이동 가능.
+class TraceCanvas extends StatefulWidget {
   final TraceTemplate template;
   final List<DrawingElement> elements;
   final DrawingElement? currentElement;
@@ -40,54 +41,139 @@ class TraceCanvas extends StatelessWidget {
   });
 
   @override
+  State<TraceCanvas> createState() => _TraceCanvasState();
+}
+
+class _TraceCanvasState extends State<TraceCanvas> {
+  static const double _maxScale = 2.0;
+
+  double _scale = 1.0;
+  Offset _offset = Offset.zero;
+
+  double _scaleOnStart = 1.0;
+  Offset _offsetOnStart = Offset.zero;
+  Offset _focalOnStart = Offset.zero;
+
+  bool _isDrawing = false;
+
+  @override
+  void didUpdateWidget(TraceCanvas old) {
+    super.didUpdateWidget(old);
+    // 도안이 바뀌면 줌 리셋
+    if (old.template != widget.template) {
+      _scale = 1.0;
+      _offset = Offset.zero;
+    }
+  }
+
+  Offset _toCanvas(Offset screenPt) => (screenPt - _offset) / _scale;
+
+  void _clampOffset(Size size) {
+    if (_scale <= 1.0) {
+      _scale = 1.0;
+      _offset = Offset.zero;
+      return;
+    }
+    _offset = Offset(
+      _offset.dx.clamp(size.width * (1.0 - _scale), 0.0),
+      _offset.dy.clamp(size.height * (1.0 - _scale), 0.0),
+    );
+  }
+
+  void _onScaleStart(ScaleStartDetails d) {
+    _scaleOnStart = _scale;
+    _offsetOnStart = _offset;
+    _focalOnStart = d.localFocalPoint;
+
+    if (d.pointerCount >= 2) {
+      _isDrawing = false;
+    } else {
+      _isDrawing = true;
+      widget.onPanStart(_toCanvas(d.localFocalPoint));
+    }
+  }
+
+  void _onScaleUpdate(ScaleUpdateDetails d, Size size) {
+    if (d.pointerCount >= 2) {
+      if (_isDrawing) {
+        widget.onPanEnd();
+        _isDrawing = false;
+      }
+      setState(() {
+        final newScale = (_scaleOnStart * d.scale).clamp(1.0, _maxScale);
+        final focalInCanvas = (_focalOnStart - _offsetOnStart) / _scaleOnStart;
+        _scale = newScale;
+        _offset = d.localFocalPoint - focalInCanvas * newScale;
+        _clampOffset(size);
+      });
+    } else if (_isDrawing) {
+      widget.onPanUpdate(_toCanvas(d.localFocalPoint));
+    }
+  }
+
+  void _onScaleEnd(ScaleEndDetails d) {
+    if (_isDrawing) widget.onPanEnd();
+    _isDrawing = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
-        WidgetsBinding.instance.addPostFrameCallback((_) => onSizeChanged(size));
+        WidgetsBinding.instance.addPostFrameCallback((_) => widget.onSizeChanged(size));
 
-        final illRect = template.completionRect(size);
+        final illRect = widget.template.completionRect(size);
 
         return GestureDetector(
-          onPanStart: (d) => onPanStart(d.localPosition),
-          onPanUpdate: (d) => onPanUpdate(d.localPosition),
-          onPanEnd: (_) => onPanEnd(),
-          child: Stack(
-            children: [
-              // 1. 흰 배경
-              const Positioned.fill(child: ColoredBox(color: Colors.white)),
+          onScaleStart: _onScaleStart,
+          onScaleUpdate: (d) => _onScaleUpdate(d, size),
+          onScaleEnd: _onScaleEnd,
+          child: ClipRect(
+            child: Transform.translate(
+              offset: _offset,
+              child: Transform.scale(
+                scale: _scale,
+                alignment: Alignment.topLeft,
+              child: Stack(
+                children: [
+                  // 1. 흰 배경
+                  const Positioned.fill(child: ColoredBox(color: Colors.white)),
 
-              // 2. 컬러 일러스트 (항상 표시, opacity 애니메이션)
-              Positioned(
-                left: illRect.left,
-                top: illRect.top,
-                width: illRect.width,
-                height: illRect.height,
-                child: Opacity(
-                  opacity: illustrationOpacity.clamp(0.0, 1.0),
-                  child: SvgPicture.asset(template.svgAsset, fit: BoxFit.fill),
-                ),
-              ),
-
-              // 3. 가이드선 + 히트존 + 스트로크 (완성 시 fade-out)
-              Opacity(
-                opacity: strokesOpacity.clamp(0.0, 1.0),
-                child: RepaintBoundary(
-                  child: CustomPaint(
-                    painter: _TracePainter(
-                      template: template,
-                      elements: elements,
-                      currentElement: currentElement,
-                      hitZone: hitZone,
-                      coverageVersion: coverageVersion,
-                      canvasSize: size,
-                      pencilProgram: pencilProgram,
+                  // 2. 컬러 일러스트 (항상 표시, opacity 애니메이션)
+                  Positioned(
+                    left: illRect.left,
+                    top: illRect.top,
+                    width: illRect.width,
+                    height: illRect.height,
+                    child: Opacity(
+                      opacity: widget.illustrationOpacity.clamp(0.0, 1.0),
+                      child: SvgPicture.asset(widget.template.svgAsset, fit: BoxFit.fill),
                     ),
-                    child: const SizedBox.expand(),
                   ),
-                ),
+
+                  // 3. 가이드선 + 히트존 + 스트로크 (완성 시 fade-out)
+                  Opacity(
+                    opacity: widget.strokesOpacity.clamp(0.0, 1.0),
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        painter: _TracePainter(
+                          template: widget.template,
+                          elements: widget.elements,
+                          currentElement: widget.currentElement,
+                          hitZone: widget.hitZone,
+                          coverageVersion: widget.coverageVersion,
+                          canvasSize: size,
+                          pencilProgram: widget.pencilProgram,
+                        ),
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+              ),
+            ),
           ),
         );
       },
