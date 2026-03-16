@@ -103,8 +103,9 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.height < 450;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: isCompact ? 8 : 16),
       child: Row(
         children: [
           _RoundButton(icon: Icons.home_rounded, onTap: () {}),
@@ -304,8 +305,11 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     final modes = ModeInfo.registry;
     final hasThreeRows = modes.length > 4;
-    final cardHeight = hasThreeRows ? 120.0 : 160.0;
-    final rowGap = hasThreeRows ? 10.0 : 14.0;
+    final isCompact = MediaQuery.of(context).size.height < 450;
+    final cardHeight = isCompact
+        ? (hasThreeRows ? 88.0 : 110.0)
+        : (hasThreeRows ? 120.0 : 160.0);
+    final rowGap = isCompact ? 8.0 : (hasThreeRows ? 10.0 : 14.0);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 0, 12),
       child: Row(
@@ -506,7 +510,10 @@ class _BottomBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          padding: EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: MediaQuery.of(context).size.height < 450 ? 8 : 14,
+          ),
           child: Row(
             children: [
               _PillButton(

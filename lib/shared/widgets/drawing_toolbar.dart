@@ -4,6 +4,10 @@ import 'package:toktok_drawing/shared/widgets/brush_size_selector.dart';
 import 'package:toktok_drawing/shared/widgets/color_palette.dart';
 import 'package:toktok_drawing/shared/widgets/tool_selector.dart';
 
+/// 그리기 툴바.
+///
+/// 가로 모드 전용 단일 행 레이아웃:
+///   [도구 선택(가로 스크롤)] | [색상 팔레트(Expanded)] | [굵기] | [취소/재실행]
 class DrawingToolbar extends StatelessWidget {
   final Color selectedColor;
   final double selectedSize;
@@ -52,7 +56,7 @@ class DrawingToolbar extends StatelessWidget {
           ),
         ),
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFFFFF9F0), Color(0xFFF0F9FF)],
@@ -67,39 +71,39 @@ class DrawingToolbar extends StatelessWidget {
           ),
           child: SafeArea(
             top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 색상 팔레트 (무지개·지우개 도구 선택 시 비활성화)
-                ColorPalette(
-                  selectedColor: selectedColor,
-                  onColorSelected: onColorChanged,
-                  disabled: selectedTool == DrawingTool.rainbowBrush ||
-                      selectedTool == DrawingTool.eraser,
+                // 도구 선택 — 좁은 화면에서도 스크롤로 모두 접근 가능
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ToolSelector(
+                    selectedTool: selectedTool,
+                    onToolSelected: onToolChanged,
+                  ),
                 ),
-                const SizedBox(height: 8),
-                // 도구 + 크기 + 실행 취소/다시 실행
-                Row(
-                  children: [
-                    ToolSelector(
-                      selectedTool: selectedTool,
-                      onToolSelected: onToolChanged,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: BrushSizeSelector(
-                        selectedSize: selectedSize,
-                        onSizeSelected: onSizeChanged,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _UndoRedoButtons(
-                      canUndo: canUndo,
-                      canRedo: canRedo,
-                      onUndo: onUndo,
-                      onRedo: onRedo,
-                    ),
-                  ],
+                const SizedBox(width: 8),
+                // 색상 팔레트 — 남은 가로 공간 전부 사용
+                Expanded(
+                  child: ColorPalette(
+                    selectedColor: selectedColor,
+                    onColorSelected: onColorChanged,
+                    disabled: selectedTool == DrawingTool.rainbowBrush ||
+                        selectedTool == DrawingTool.eraser,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // 굵기 선택
+                BrushSizeSelector(
+                  selectedSize: selectedSize,
+                  onSizeSelected: onSizeChanged,
+                ),
+                // 실행 취소 / 다시 실행
+                _UndoRedoButtons(
+                  canUndo: canUndo,
+                  canRedo: canRedo,
+                  onUndo: onUndo,
+                  onRedo: onRedo,
                 ),
               ],
             ),

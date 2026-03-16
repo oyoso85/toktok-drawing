@@ -57,6 +57,10 @@ class _TraceCanvasState extends State<TraceCanvas> {
   Offset _focalOnStart = Offset.zero;
   bool _isDrawing = false;
 
+  // ── 완성된 strokes 캐시 (DrawingCanvas와 동일 구조) ────
+  ui.Picture? _completedPicture;
+  int _completedCount = 0;
+
   // ── 무지개 세그먼트 누적 캐시 ──────────────────────────
   ui.Picture? _rainbowPicture;
   int _rainbowSegCount = 0;
@@ -64,18 +68,26 @@ class _TraceCanvasState extends State<TraceCanvas> {
   @override
   void initState() {
     super.initState();
+    _updateCompletedPicture();
   }
 
   @override
   void didUpdateWidget(TraceCanvas old) {
     super.didUpdateWidget(old);
-    // 도안이 바뀌면 줌 + 무지개 캐시 리셋
+    // 도안이 바뀌면 줌 + 모든 캐시 리셋
     if (old.template != widget.template) {
       _scale = 1.0;
       _offset = Offset.zero;
+      _completedPicture?.dispose();
+      _completedPicture = null;
+      _completedCount = 0;
       _rainbowPicture?.dispose();
       _rainbowPicture = null;
       _rainbowSegCount = 0;
+    }
+    if (!identical(widget.elements, old.elements) ||
+        widget.pencilProgram != old.pencilProgram) {
+      _updateCompletedPicture();
     }
     if (!identical(widget.currentElement, old.currentElement)) {
       _updateRainbowCache();
@@ -84,8 +96,40 @@ class _TraceCanvasState extends State<TraceCanvas> {
 
   @override
   void dispose() {
+    _completedPicture?.dispose();
     _rainbowPicture?.dispose();
     super.dispose();
+  }
+
+  void _updateCompletedPicture() {
+    final elements = widget.elements;
+    if (elements.length == _completedCount && _completedPicture != null) return;
+
+    if (elements.isEmpty) {
+      _completedPicture?.dispose();
+      _completedPicture = null;
+      _completedCount = 0;
+      return;
+    }
+
+    final recorder = ui.PictureRecorder();
+    final c = Canvas(recorder);
+    final renderer = _TraceRenderer(widget.pencilProgram);
+
+    if (elements.length > _completedCount && _completedPicture != null) {
+      c.drawPicture(_completedPicture!);
+      for (int i = _completedCount; i < elements.length; i++) {
+        renderer.drawElement(c, elements[i]);
+      }
+    } else {
+      for (final el in elements) {
+        renderer.drawElement(c, el);
+      }
+    }
+
+    _completedPicture?.dispose();
+    _completedPicture = recorder.endRecording();
+    _completedCount = elements.length;
   }
 
   void _updateRainbowCache() {
@@ -238,7 +282,7 @@ class _TraceCanvasState extends State<TraceCanvas> {
                       child: CustomPaint(
                         painter: _TracePainter(
                           template: widget.template,
-                          elements: widget.elements,
+                          completedPicture: _completedPicture,
                           currentElement: widget.currentElement,
                           rainbowPicture: _rainbowPicture,
                           hitZone: widget.hitZone,
@@ -263,7 +307,8 @@ class _TraceCanvasState extends State<TraceCanvas> {
 
 class _TracePainter extends CustomPainter with StrokePainterMixin {
   final TraceTemplate template;
-  final List<DrawingElement> elements;
+  /// 완성된 strokes를 구운 Picture — saveLayer 밖에서 drawPicture로 O(1) 렌더
+  final ui.Picture? completedPicture;
   final DrawingElement? currentElement;
   /// 현재 무지개 stroke의 누적 세그먼트 Picture (끝 캡 제외)
   final ui.Picture? rainbowPicture;
@@ -275,7 +320,7 @@ class _TracePainter extends CustomPainter with StrokePainterMixin {
 
   const _TracePainter({
     required this.template,
-    required this.elements,
+    this.completedPicture,
     required this.currentElement,
     this.rainbowPicture,
     this.hitZone,
@@ -296,16 +341,22 @@ class _TracePainter extends CustomPainter with StrokePainterMixin {
 
     // 3. 사용자 스트로크 — 히트존 영역에만 클리핑
     final hz = hitZone;
-    canvas.save();
-    if (hz != null && hz.segments.isNotEmpty) {
-      canvas.clipPath(hz.buildClipPath());
+    final hasClip = hz != null && hz.segments.isNotEmpty;
+
+    // 완성된 strokes: saveLayer 밖에서 drawPicture → GPU 텍스처 캐시 유지, O(1)
+    if (completedPicture != null) {
+      canvas.save();
+      if (hasClip) canvas.clipPath(hz.clipPath);
+      canvas.drawPicture(completedPicture!);
+      canvas.restore();
     }
-    canvas.saveLayer(Offset.zero & size, Paint());
-    for (final el in elements) {
-      drawElement(canvas, el);
-    }
+
+    // 현재 그리는 element만 saveLayer (지우개 BlendMode.clear 지원)
     final current = currentElement;
     if (current != null) {
+      canvas.save();
+      if (hasClip) canvas.clipPath(hz.clipPath);
+      canvas.saveLayer(Offset.zero & size, Paint());
       if (current is RainbowStroke &&
           current.tool != DrawingTool.brush &&
           rainbowPicture != null) {
@@ -314,9 +365,9 @@ class _TracePainter extends CustomPainter with StrokePainterMixin {
       } else {
         drawElement(canvas, current);
       }
+      canvas.restore();
+      canvas.restore();
     }
-    canvas.restore();
-    canvas.restore();
   }
 
   void _drawHitZone(Canvas canvas) {
@@ -388,10 +439,17 @@ class _TracePainter extends CustomPainter with StrokePainterMixin {
   @override
   bool shouldRepaint(_TracePainter old) =>
       old.template != template ||
-      old.elements != elements ||
+      !identical(old.completedPicture, completedPicture) ||
       old.currentElement != currentElement ||
       !identical(old.rainbowPicture, rainbowPicture) ||
       old.hitZone != hitZone ||
       old.coverageVersion != coverageVersion ||
       old.pencilProgram != pencilProgram;
+}
+
+// ── StrokePainterMixin standalone 헬퍼 ─────────────────────────────────────
+class _TraceRenderer with StrokePainterMixin {
+  @override
+  final ui.FragmentProgram? pencilProgram;
+  _TraceRenderer(this.pencilProgram);
 }

@@ -10,6 +10,9 @@ class HitZone {
   final double hitRadius;
   final List<bool> segmentCovered;
 
+  /// 클리핑 Path 캐시 — 최초 접근 시 한 번만 생성 (히트존 형태 불변).
+  Path? _clipPathCache;
+
   HitZone._({
     required this.segments,
     required this.hitRadius,
@@ -95,8 +98,12 @@ class HitZone {
     }
   }
 
-  /// 히트존 전체를 하나의 클리핑 Path로 반환 (세그먼트 원들의 합집합).
-  Path buildClipPath() {
+  /// 히트존 클리핑 Path — 최초 접근 시 한 번만 생성 후 캐시.
+  Path get clipPath {
+    return _clipPathCache ??= _buildClipPath();
+  }
+
+  Path _buildClipPath() {
     final path = Path();
     for (final seg in segments) {
       path.addOval(Rect.fromCircle(center: seg, radius: hitRadius));

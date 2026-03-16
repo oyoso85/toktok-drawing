@@ -306,26 +306,24 @@ class _CanvasPainter extends CustomPainter with StrokePainterMixin {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     canvas.drawRect(rect, Paint()..color = backgroundColor);
-    canvas.saveLayer(rect, Paint());
 
-    // 완성된 strokes: O(1) — 단일 drawPicture 호출
+    // 완성된 strokes: saveLayer 밖에서 drawPicture → GPU 텍스처 캐시 유지, O(1)
     if (completedPicture != null) canvas.drawPicture(completedPicture!);
 
-    // 현재 그리는 element
+    // 현재 그리는 element만 saveLayer (지우개 BlendMode.clear 지원)
     final current = currentElement;
     if (current != null) {
+      canvas.saveLayer(rect, Paint());
       if (current is RainbowStroke &&
           current.tool != DrawingTool.brush &&
           rainbowPicture != null) {
-        // 무지개 pen: 캐시된 세그먼트 Picture + 끝 캡만 재렌더
         canvas.drawPicture(rainbowPicture!);
         _drawEndCap(canvas, current);
       } else {
         drawElement(canvas, current);
       }
+      canvas.restore();
     }
-
-    canvas.restore();
   }
 
   /// 끝 캡: 매 프레임 마지막 포인트 색상으로 재렌더
