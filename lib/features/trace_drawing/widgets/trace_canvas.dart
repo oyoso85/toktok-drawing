@@ -61,9 +61,11 @@ class _TraceCanvasState extends State<TraceCanvas> {
   ui.Picture? _completedPicture;
   int _completedCount = 0;
 
-  // ── 무지개 세그먼트 누적 캐시 ──────────────────────────
-  ui.Picture? _rainbowPicture;
-  int _rainbowSegCount = 0;
+  // ── 무지개 세그먼트 GPU 텍스처 체크포인트 ──────────────
+  ui.Image? _rainbowImage;
+  int _checkpointSegCount = 0;
+  Size? _canvasSize;
+  static const int _kCheckpointInterval = 10;
 
   @override
   void initState() {
@@ -81,9 +83,7 @@ class _TraceCanvasState extends State<TraceCanvas> {
       _completedPicture?.dispose();
       _completedPicture = null;
       _completedCount = 0;
-      _rainbowPicture?.dispose();
-      _rainbowPicture = null;
-      _rainbowSegCount = 0;
+      _resetRainbowCache();
     }
     if (!identical(widget.elements, old.elements) ||
         widget.pencilProgram != old.pencilProgram) {
@@ -97,7 +97,7 @@ class _TraceCanvasState extends State<TraceCanvas> {
   @override
   void dispose() {
     _completedPicture?.dispose();
-    _rainbowPicture?.dispose();
+    _rainbowImage?.dispose();
     super.dispose();
   }
 
@@ -132,61 +132,51 @@ class _TraceCanvasState extends State<TraceCanvas> {
     _completedCount = elements.length;
   }
 
+  void _resetRainbowCache() {
+    _rainbowImage?.dispose();
+    _rainbowImage = null;
+    _checkpointSegCount = 0;
+  }
+
   void _updateRainbowCache() {
     final current = widget.currentElement;
 
     if (current is! RainbowStroke || current.tool == DrawingTool.brush) {
-      _rainbowPicture?.dispose();
-      _rainbowPicture = null;
-      _rainbowSegCount = 0;
+      _resetRainbowCache();
       return;
     }
 
-    final targetSeg = current.points.length - 1;
+    final totalSeg = current.points.length - 1;
+    if (totalSeg < _checkpointSegCount) _resetRainbowCache();
 
-    if (targetSeg < _rainbowSegCount) {
-      _rainbowPicture?.dispose();
-      _rainbowPicture = null;
-      _rainbowSegCount = 0;
+    final pending = totalSeg - _checkpointSegCount;
+    if (pending >= _kCheckpointInterval && _canvasSize != null) {
+      _buildCheckpoint(current, totalSeg);
     }
+  }
 
-    if (targetSeg <= _rainbowSegCount) return;
-
+  void _buildCheckpoint(RainbowStroke stroke, int upToSeg) {
+    final size = _canvasSize!;
     final recorder = ui.PictureRecorder();
     final c = Canvas(recorder);
+    final renderer = _TraceRenderer(widget.pencilProgram);
 
-    if (_rainbowSegCount == 0) {
-      final startColor = current.colors.isNotEmpty ? current.colors[0] : const Color(0xFFFF0000);
-      final capPaint = Paint()..color = startColor..style = PaintingStyle.fill;
-      if (current.blurSigma > 0) {
-        capPaint.maskFilter = MaskFilter.blur(BlurStyle.normal, current.blurSigma);
-      }
-      c.drawCircle(current.points.first, current.size / 2, capPaint);
+    if (_rainbowImage != null) {
+      c.drawImage(_rainbowImage!, Offset.zero, Paint());
     } else {
-      c.drawPicture(_rainbowPicture!);
+      final startColor = stroke.colors.isNotEmpty ? stroke.colors[0] : const Color(0xFFFF0000);
+      c.drawCircle(stroke.points.first, stroke.size / 2,
+          Paint()..color = startColor..style = PaintingStyle.fill);
     }
 
-    final segPaint = Paint()
-      ..strokeWidth = current.size
-      ..strokeCap = current.blurSigma > 0 ? StrokeCap.square : StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    if (current.blurSigma > 0) {
-      segPaint.maskFilter = MaskFilter.blur(BlurStyle.normal, current.blurSigma);
-    }
+    renderer.drawRainbowSegmentRange(c, stroke, _checkpointSegCount, upToSeg);
 
-    for (int i = _rainbowSegCount; i < targetSeg; i++) {
-      final p0 = current.points[i];
-      final p1 = current.points[i + 1];
-      if ((p1 - p0).distance < 0.5) continue;
-      final c0 = i < current.colors.length ? current.colors[i] : current.colors.last;
-      final c1 = (i + 1) < current.colors.length ? current.colors[i + 1] : c0;
-      segPaint.shader = ui.Gradient.linear(p0, p1, [c0, c1]);
-      c.drawLine(p0, p1, segPaint);
-    }
-
-    _rainbowPicture?.dispose();
-    _rainbowPicture = recorder.endRecording();
-    _rainbowSegCount = targetSeg;
+    final picture = recorder.endRecording();
+    final oldImage = _rainbowImage;
+    _rainbowImage = picture.toImageSync(size.width.round(), size.height.round());
+    picture.dispose();
+    oldImage?.dispose();
+    _checkpointSegCount = upToSeg;
   }
 
   Offset _toCanvas(Offset screenPt) => (screenPt - _offset) / _scale;
@@ -244,6 +234,7 @@ class _TraceCanvasState extends State<TraceCanvas> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
+        _canvasSize = size;
         WidgetsBinding.instance.addPostFrameCallback((_) => widget.onSizeChanged(size));
 
         final illRect = widget.template.completionRect(size);
@@ -284,7 +275,8 @@ class _TraceCanvasState extends State<TraceCanvas> {
                           template: widget.template,
                           completedPicture: _completedPicture,
                           currentElement: widget.currentElement,
-                          rainbowPicture: _rainbowPicture,
+                          rainbowImage: _rainbowImage,
+                          checkpointSegCount: _checkpointSegCount,
                           hitZone: widget.hitZone,
                           coverageVersion: widget.coverageVersion,
                           canvasSize: size,
@@ -307,11 +299,11 @@ class _TraceCanvasState extends State<TraceCanvas> {
 
 class _TracePainter extends CustomPainter with StrokePainterMixin {
   final TraceTemplate template;
-  /// 완성된 strokes를 구운 Picture — saveLayer 밖에서 drawPicture로 O(1) 렌더
   final ui.Picture? completedPicture;
   final DrawingElement? currentElement;
-  /// 현재 무지개 stroke의 누적 세그먼트 Picture (끝 캡 제외)
-  final ui.Picture? rainbowPicture;
+  /// 무지개 stroke GPU 텍스처 체크포인트
+  final ui.Image? rainbowImage;
+  final int checkpointSegCount;
   final HitZone? hitZone;
   final int coverageVersion;
   final Size canvasSize;
@@ -322,7 +314,8 @@ class _TracePainter extends CustomPainter with StrokePainterMixin {
     required this.template,
     this.completedPicture,
     required this.currentElement,
-    this.rainbowPicture,
+    this.rainbowImage,
+    this.checkpointSegCount = 0,
     this.hitZone,
     this.coverageVersion = 0,
     required this.canvasSize,
@@ -331,8 +324,6 @@ class _TracePainter extends CustomPainter with StrokePainterMixin {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 배경은 Stack의 ColoredBox가 담당하므로 여기서는 투명하게 유지
-
     // 1. 히트존 — 미커버 세그먼트만 노란 반투명 원
     _drawHitZone(canvas);
 
@@ -343,7 +334,7 @@ class _TracePainter extends CustomPainter with StrokePainterMixin {
     final hz = hitZone;
     final hasClip = hz != null && hz.segments.isNotEmpty;
 
-    // 완성된 strokes: saveLayer 밖에서 drawPicture → GPU 텍스처 캐시 유지, O(1)
+    // 완성된 strokes: saveLayer 밖 → GPU 텍스처 캐시 유지, O(1)
     if (completedPicture != null) {
       canvas.save();
       if (hasClip) canvas.clipPath(hz.clipPath);
@@ -351,23 +342,43 @@ class _TracePainter extends CustomPainter with StrokePainterMixin {
       canvas.restore();
     }
 
-    // 현재 그리는 element만 saveLayer (지우개 BlendMode.clear 지원)
+    // 현재 element
     final current = currentElement;
     if (current != null) {
       canvas.save();
       if (hasClip) canvas.clipPath(hz.clipPath);
-      canvas.saveLayer(Offset.zero & size, Paint());
-      if (current is RainbowStroke &&
-          current.tool != DrawingTool.brush &&
-          rainbowPicture != null) {
-        canvas.drawPicture(rainbowPicture!);
+
+      if (current is RainbowStroke && current.tool != DrawingTool.brush) {
+        // 무지개 pen: saveLayer 불필요, blur는 ImageFilter로 1회 적용
+        final hasBlur = current.blurSigma > 0;
+        if (hasBlur) {
+          canvas.saveLayer(Offset.zero & size,
+              Paint()..imageFilter = ui.ImageFilter.blur(
+                  sigmaX: current.blurSigma, sigmaY: current.blurSigma));
+        }
+        if (rainbowImage != null) {
+          canvas.drawImage(rainbowImage!, Offset.zero, Paint());
+        } else if (current.points.isNotEmpty) {
+          final startColor = current.colors.isNotEmpty ? current.colors[0] : const Color(0xFFFF0000);
+          canvas.drawCircle(current.points.first, current.size / 2,
+              Paint()..color = startColor..style = PaintingStyle.fill);
+        }
+        _drawPendingSegments(canvas, current);
         _drawEndCap(canvas, current);
+        if (hasBlur) canvas.restore();
       } else {
+        canvas.saveLayer(Offset.zero & size, Paint());
         drawElement(canvas, current);
+        canvas.restore();
       }
       canvas.restore();
-      canvas.restore();
     }
+  }
+
+  void _drawPendingSegments(Canvas canvas, RainbowStroke stroke) {
+    final totalSeg = stroke.points.length - 1;
+    if (totalSeg <= checkpointSegCount) return;
+    drawRainbowSegmentRange(canvas, stroke, checkpointSegCount, totalSeg);
   }
 
   void _drawHitZone(Canvas canvas) {
@@ -441,7 +452,8 @@ class _TracePainter extends CustomPainter with StrokePainterMixin {
       old.template != template ||
       !identical(old.completedPicture, completedPicture) ||
       old.currentElement != currentElement ||
-      !identical(old.rainbowPicture, rainbowPicture) ||
+      !identical(old.rainbowImage, rainbowImage) ||
+      old.checkpointSegCount != checkpointSegCount ||
       old.hitZone != hitZone ||
       old.coverageVersion != coverageVersion ||
       old.pencilProgram != pencilProgram;

@@ -51,10 +51,12 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   ui.Picture? _completedPicture;
   int _completedCount = 0; // _completedPicture에 포함된 elements 수
 
-  /// 현재 그리는 무지개 stroke의 누적 세그먼트 Picture.
-  /// 새 세그먼트만 incremental하게 추가 — 끝 캡은 매 프레임 painter가 직접 그림.
-  ui.Picture? _rainbowPicture;
-  int _rainbowSegCount = 0; // _rainbowPicture에 포함된 세그먼트 수
+  /// 무지개 stroke 누적 세그먼트를 GPU 텍스처로 구운 이미지.
+  /// 매 [_kCheckpointInterval] 세그먼트마다 toImageSync()로 평탄화 → O(1) drawImage.
+  ui.Image? _rainbowImage;
+  int _checkpointSegCount = 0; // _rainbowImage에 구워진 세그먼트 수
+  Size? _canvasSize; // toImageSync 해상도 결정용
+  static const int _kCheckpointInterval = 10;
 
   // ── 라이프사이클 ────────────────────────────────────────
   @override
@@ -81,7 +83,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   @override
   void dispose() {
     _completedPicture?.dispose();
-    _rainbowPicture?.dispose();
+    _rainbowImage?.dispose();
     super.dispose();
   }
 
@@ -123,68 +125,63 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     _completedCount = elements.length;
   }
 
-  /// 현재 그리는 무지개 stroke의 새 세그먼트를 Picture에 누적한다.
-  /// 붓(brush) 변형은 속도 기반 굵기 계산 때문에 캐시 불가 → 그대로 painter에 위임.
+  /// 무지개 캐시 초기화.
+  void _resetRainbowCache() {
+    _rainbowImage?.dispose();
+    _rainbowImage = null;
+    _checkpointSegCount = 0;
+  }
+
+  /// 현재 무지개 stroke의 세그먼트를 [_kCheckpointInterval]마다 GPU 이미지로 평탄화.
+  /// 붓(brush) 변형은 속도 기반 굵기 계산 때문에 캐시 불가 → painter에 위임.
   void _updateRainbowCache() {
     final current = widget.currentElement;
 
-    // 무지개 pen이 아니면 캐시 해제
     if (current is! RainbowStroke || current.tool == DrawingTool.brush) {
-      _rainbowPicture?.dispose();
-      _rainbowPicture = null;
-      _rainbowSegCount = 0;
+      _resetRainbowCache();
       return;
     }
 
-    final targetSeg = current.points.length - 1; // 그려야 할 세그먼트 수
+    final totalSeg = current.points.length - 1;
 
-    // 포인트가 줄었다 = 새 stroke 시작 → 캐시 리셋
-    if (targetSeg < _rainbowSegCount) {
-      _rainbowPicture?.dispose();
-      _rainbowPicture = null;
-      _rainbowSegCount = 0;
+    // 세그먼트 수가 줄었다 = 새 stroke 시작
+    if (totalSeg < _checkpointSegCount) _resetRainbowCache();
+
+    // 체크포인트 조건: 미구운 세그먼트가 임계치 이상이고 캔버스 크기를 알 때
+    final pending = totalSeg - _checkpointSegCount;
+    if (pending >= _kCheckpointInterval && _canvasSize != null) {
+      _buildCheckpoint(current, totalSeg);
     }
+  }
 
-    if (targetSeg <= _rainbowSegCount) return; // 새 세그먼트 없음
-
+  /// 현재 stroke의 세그먼트 [0, upToSeg)를 GPU 텍스처로 평탄화.
+  /// 이후 drawImage 한 번으로 O(1) 재생.
+  void _buildCheckpoint(RainbowStroke stroke, int upToSeg) {
+    final size = _canvasSize!;
     final recorder = ui.PictureRecorder();
     final c = Canvas(recorder);
+    final renderer = _Renderer(widget.pencilProgram);
 
-    if (_rainbowSegCount == 0) {
-      // 첫 배치: 시작 캡을 Picture에 포함
-      final startColor = current.colors.isNotEmpty ? current.colors[0] : const Color(0xFFFF0000);
-      final capPaint = Paint()..color = startColor..style = PaintingStyle.fill;
-      if (current.blurSigma > 0) {
-        capPaint.maskFilter = MaskFilter.blur(BlurStyle.normal, current.blurSigma);
-      }
-      c.drawCircle(current.points.first, current.size / 2, capPaint);
+    if (_rainbowImage != null) {
+      // 기존 이미지 위에 새 세그먼트 추가
+      c.drawImage(_rainbowImage!, Offset.zero, Paint());
     } else {
-      // 기존 Picture 위에 새 세그먼트 추가
-      c.drawPicture(_rainbowPicture!);
+      // 첫 체크포인트: 시작 캡 포함 (blur 없이 — painter 레이어에서 적용)
+      final startColor = stroke.colors.isNotEmpty ? stroke.colors[0] : const Color(0xFFFF0000);
+      c.drawCircle(stroke.points.first, stroke.size / 2,
+          Paint()..color = startColor..style = PaintingStyle.fill);
     }
 
-    // 새 세그먼트만 그리기
-    final segPaint = Paint()
-      ..strokeWidth = current.size
-      ..strokeCap = current.blurSigma > 0 ? StrokeCap.square : StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    if (current.blurSigma > 0) {
-      segPaint.maskFilter = MaskFilter.blur(BlurStyle.normal, current.blurSigma);
-    }
+    // drawVertices 1 call → O(1) GPU draw call
+    renderer.drawRainbowSegmentRange(c, stroke, _checkpointSegCount, upToSeg);
 
-    for (int i = _rainbowSegCount; i < targetSeg; i++) {
-      final p0 = current.points[i];
-      final p1 = current.points[i + 1];
-      if ((p1 - p0).distance < 0.5) continue;
-      final c0 = i < current.colors.length ? current.colors[i] : current.colors.last;
-      final c1 = (i + 1) < current.colors.length ? current.colors[i + 1] : c0;
-      segPaint.shader = ui.Gradient.linear(p0, p1, [c0, c1]);
-      c.drawLine(p0, p1, segPaint);
-    }
-
-    _rainbowPicture?.dispose();
-    _rainbowPicture = recorder.endRecording();
-    _rainbowSegCount = targetSeg;
+    final picture = recorder.endRecording();
+    final oldImage = _rainbowImage;
+    // toImageSync: 동기적으로 GPU 텍스처 생성 (Flutter 3.7+)
+    _rainbowImage = picture.toImageSync(size.width.round(), size.height.round());
+    picture.dispose();
+    oldImage?.dispose();
+    _checkpointSegCount = upToSeg;
   }
 
   // ── 좌표 변환 ──────────────────────────────────────────
@@ -245,6 +242,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
+        _canvasSize = size;
         return GestureDetector(
           onScaleStart: _onScaleStart,
           onScaleUpdate: (d) => _onScaleUpdate(d, size),
@@ -260,7 +258,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
                     painter: _CanvasPainter(
                       completedPicture: _completedPicture,
                       currentElement: widget.currentElement,
-                      rainbowPicture: _rainbowPicture,
+                      rainbowImage: _rainbowImage,
+                      checkpointSegCount: _checkpointSegCount,
                       backgroundColor: widget.backgroundColor,
                       pencilProgram: widget.pencilProgram,
                     ),
@@ -288,8 +287,10 @@ class _CanvasPainter extends CustomPainter with StrokePainterMixin {
   /// 완성된 모든 strokes를 구운 Picture (null = 아직 없음)
   final ui.Picture? completedPicture;
   final DrawingElement? currentElement;
-  /// 현재 무지개 stroke의 누적 세그먼트 Picture (끝 캡 제외)
-  final ui.Picture? rainbowPicture;
+  /// 무지개 stroke의 GPU 텍스처 체크포인트
+  final ui.Image? rainbowImage;
+  /// rainbowImage에 이미 구워진 세그먼트 수 (painter가 그 이후만 직접 그림)
+  final int checkpointSegCount;
   final Color backgroundColor;
   @override
   final ui.FragmentProgram? pencilProgram;
@@ -297,7 +298,8 @@ class _CanvasPainter extends CustomPainter with StrokePainterMixin {
   const _CanvasPainter({
     required this.completedPicture,
     required this.currentElement,
-    required this.rainbowPicture,
+    required this.rainbowImage,
+    required this.checkpointSegCount,
     required this.backgroundColor,
     this.pencilProgram,
   });
@@ -307,23 +309,48 @@ class _CanvasPainter extends CustomPainter with StrokePainterMixin {
     final rect = Offset.zero & size;
     canvas.drawRect(rect, Paint()..color = backgroundColor);
 
-    // 완성된 strokes: saveLayer 밖에서 drawPicture → GPU 텍스처 캐시 유지, O(1)
+    // 완성된 strokes: saveLayer 밖 → GPU 텍스처 캐시 유지, O(1)
     if (completedPicture != null) canvas.drawPicture(completedPicture!);
 
-    // 현재 그리는 element만 saveLayer (지우개 BlendMode.clear 지원)
+    // 현재 그리는 element
     final current = currentElement;
     if (current != null) {
-      canvas.saveLayer(rect, Paint());
-      if (current is RainbowStroke &&
-          current.tool != DrawingTool.brush &&
-          rainbowPicture != null) {
-        canvas.drawPicture(rainbowPicture!);
+      if (current is RainbowStroke && current.tool != DrawingTool.brush) {
+        // 무지개 pen: saveLayer 불필요 (BlendMode.clear 없음)
+        // blur는 전체 레이어에 ImageFilter로 1회 적용
+        final hasBlur = current.blurSigma > 0;
+        if (hasBlur) {
+          canvas.saveLayer(rect,
+              Paint()..imageFilter = ui.ImageFilter.blur(
+                  sigmaX: current.blurSigma, sigmaY: current.blurSigma));
+        }
+        // 1) 체크포인트 이미지: O(1) GPU blit
+        if (rainbowImage != null) {
+          canvas.drawImage(rainbowImage!, Offset.zero, Paint());
+        } else if (current.points.isNotEmpty) {
+          final startColor = current.colors.isNotEmpty ? current.colors[0] : const Color(0xFFFF0000);
+          canvas.drawCircle(current.points.first, current.size / 2,
+              Paint()..color = startColor..style = PaintingStyle.fill);
+        }
+        // 2) pending 세그먼트: drawVertices 1 call
+        _drawPendingSegments(canvas, current);
+        // 3) 끝 캡
         _drawEndCap(canvas, current);
+        if (hasBlur) canvas.restore();
       } else {
+        // 지우개 포함 다른 도구: saveLayer 유지 (BlendMode.clear 지원)
+        canvas.saveLayer(rect, Paint());
         drawElement(canvas, current);
+        canvas.restore();
       }
-      canvas.restore();
     }
+  }
+
+  /// 체크포인트 이후 미구운 세그먼트를 drawVertices 1 call로 렌더.
+  void _drawPendingSegments(Canvas canvas, RainbowStroke stroke) {
+    final totalSeg = stroke.points.length - 1;
+    if (totalSeg <= checkpointSegCount) return;
+    drawRainbowSegmentRange(canvas, stroke, checkpointSegCount, totalSeg);
   }
 
   /// 끝 캡: 매 프레임 마지막 포인트 색상으로 재렌더
@@ -331,9 +358,7 @@ class _CanvasPainter extends CustomPainter with StrokePainterMixin {
     if (stroke.points.isEmpty) return;
     final color = stroke.colors.isNotEmpty ? stroke.colors.last : const Color(0xFFFF0000);
     final paint = Paint()..color = color..style = PaintingStyle.fill;
-    if (stroke.blurSigma > 0) {
-      paint.maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.blurSigma);
-    }
+    if (stroke.blurSigma > 0) paint.maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.blurSigma);
     canvas.drawCircle(stroke.points.last, stroke.size / 2, paint);
   }
 
@@ -341,7 +366,8 @@ class _CanvasPainter extends CustomPainter with StrokePainterMixin {
   bool shouldRepaint(_CanvasPainter old) =>
       !identical(old.completedPicture, completedPicture) ||
       !identical(old.currentElement, currentElement) ||
-      !identical(old.rainbowPicture, rainbowPicture) ||
+      !identical(old.rainbowImage, rainbowImage) ||
+      old.checkpointSegCount != checkpointSegCount ||
       old.backgroundColor != backgroundColor ||
       old.pencilProgram != pencilProgram;
 }

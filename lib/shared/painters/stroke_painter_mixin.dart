@@ -169,22 +169,21 @@ mixin StrokePainterMixin {
   }
 
   // ── 무지개 붓 ────────────────────────────────────────────
-  void _drawRainbow(Canvas canvas, RainbowStroke stroke) {
-    if (stroke.points.isEmpty) return;
-    if (stroke.tool == DrawingTool.brush) {
-      _drawRainbowBrush(canvas, stroke);
-      return;
-    }
-    if (stroke.points.length == 1) {
-      canvas.drawCircle(stroke.points[0], stroke.size / 2, Paint()
-        ..color = stroke.colors.isNotEmpty ? stroke.colors[0] : const Color(0xFFFF0000)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.blurSigma)
-        ..style = PaintingStyle.fill);
-      return;
-    }
-    // StrokeCap.round 캡 겹침 문제(Flutter #132436) 방지:
-    // 세그먼트는 butt 캡으로, 시작·끝에만 원형 캡 수동 추가.
-    for (int i = 0; i < stroke.points.length - 1; i++) {
+
+  /// [fromSeg, toSeg) 범위의 무지개 세그먼트를 triangle strip으로 렌더.
+  /// Gradient.linear N개 + drawLine N번 대신 drawVertices 1번 → GPU draw call O(1).
+  void drawRainbowSegmentRange(
+      Canvas canvas, RainbowStroke stroke, int fromSeg, int toSeg) {
+    final end = math.min(toSeg, stroke.points.length - 1);
+    if (end <= fromSeg) return;
+
+    final halfWidth = stroke.size / 2;
+    final positions = <Offset>[];
+    final colors = <Color>[];
+    final indices = <int>[];
+    int vi = 0;
+
+    for (int i = fromSeg; i < end; i++) {
       final p0 = stroke.points[i];
       final p1 = stroke.points[i + 1];
       if ((p1 - p0).distance < 0.5) continue;
@@ -192,26 +191,64 @@ mixin StrokePainterMixin {
       final c0 = i < stroke.colors.length ? stroke.colors[i] : stroke.colors.last;
       final c1 = (i + 1) < stroke.colors.length ? stroke.colors[i + 1] : c0;
 
-      final paint = Paint()
-        ..strokeWidth = stroke.size
-        ..strokeCap = stroke.blurSigma > 0 ? StrokeCap.square : StrokeCap.round
-        ..style = PaintingStyle.stroke
-        ..shader = ui.Gradient.linear(p0, p1, [c0, c1]);
-      if (stroke.blurSigma > 0) {
-        paint.maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.blurSigma);
-      }
-      canvas.drawLine(p0, p1, paint);
+      // 수직 벡터로 선분을 두께 있는 사각형(쿼드)으로 확장
+      final d = p1 - p0;
+      final len = d.distance;
+      final perp = Offset(-d.dy / len, d.dx / len) * halfWidth;
+
+      positions.addAll([p0 + perp, p0 - perp, p1 + perp, p1 - perp]);
+      colors.addAll([c0, c0, c1, c1]);
+      // 삼각형 2개: (0,1,2), (1,3,2)
+      indices.addAll([vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2]);
+      vi += 4;
     }
 
-    final startColor = stroke.colors.isNotEmpty ? stroke.colors[0] : const Color(0xFFFF0000);
-    final startCapPaint = Paint()..color = startColor..style = PaintingStyle.fill;
-    if (stroke.blurSigma > 0) startCapPaint.maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.blurSigma);
-    canvas.drawCircle(stroke.points.first, stroke.size / 2, startCapPaint);
+    if (positions.isEmpty) return;
+    canvas.drawVertices(
+      ui.Vertices(ui.VertexMode.triangles, positions,
+          colors: colors, indices: indices),
+      BlendMode.srcOver,
+      Paint()..isAntiAlias = true,
+    );
+  }
 
-    final endColor = stroke.colors.isNotEmpty ? stroke.colors.last : startColor;
-    final endCapPaint = Paint()..color = endColor..style = PaintingStyle.fill;
-    if (stroke.blurSigma > 0) endCapPaint.maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.blurSigma);
-    canvas.drawCircle(stroke.points.last, stroke.size / 2, endCapPaint);
+  void _drawRainbow(Canvas canvas, RainbowStroke stroke) {
+    if (stroke.points.isEmpty) return;
+    if (stroke.tool == DrawingTool.brush) {
+      _drawRainbowBrush(canvas, stroke);
+      return;
+    }
+    if (stroke.points.length == 1) {
+      canvas.drawCircle(stroke.points[0], stroke.size / 2,
+          Paint()
+            ..color = stroke.colors.isNotEmpty ? stroke.colors[0] : const Color(0xFFFF0000)
+            ..style = PaintingStyle.fill);
+      return;
+    }
+
+    final hasBlur = stroke.blurSigma > 0;
+    // blur는 전체 stroke 레이어에 1회 적용 → 세그먼트별 MaskFilter 제거
+    if (hasBlur) {
+      canvas.saveLayer(
+          null,
+          Paint()
+            ..imageFilter = ui.ImageFilter.blur(
+                sigmaX: stroke.blurSigma, sigmaY: stroke.blurSigma));
+    }
+
+    drawRainbowSegmentRange(canvas, stroke, 0, stroke.points.length - 1);
+
+    // 시작·끝 캡 (원형)
+    final startColor =
+        stroke.colors.isNotEmpty ? stroke.colors[0] : const Color(0xFFFF0000);
+    final endColor =
+        stroke.colors.isNotEmpty ? stroke.colors.last : startColor;
+    canvas.drawCircle(stroke.points.first, stroke.size / 2,
+        Paint()..color = startColor..style = PaintingStyle.fill);
+    canvas.drawCircle(stroke.points.last, stroke.size / 2,
+        Paint()..color = endColor..style = PaintingStyle.fill);
+
+    if (hasBlur) canvas.restore();
   }
 
   void _drawRainbowBrush(Canvas canvas, RainbowStroke stroke) {
