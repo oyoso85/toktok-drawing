@@ -107,7 +107,7 @@ class _ModeCardState extends State<ModeCard>
       child: AnimatedPressable(
         onTap: widget.onTap,
         child: Container(
-          width: 140,
+          width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -115,8 +115,8 @@ class _ModeCardState extends State<ModeCard>
             boxShadow: [
               // 레퍼런스 card-shadow: 골드 하단 그림자
               BoxShadow(
-                color: _kPrimary.withValues(alpha: 0.25),
-                offset: const Offset(0, 8),
+                color: Colors.black.withValues(alpha: 0.12),
+                offset: const Offset(0, 4),
                 blurRadius: 0,
                 spreadRadius: 0,
               ),
@@ -146,7 +146,7 @@ class _ModeCardState extends State<ModeCard>
                         child: Center(
                           child: Icon(
                             widget.modeInfo.icon,
-                            size: 56,
+                            size: 84,
                             color: _kPrimary.withValues(alpha: 0.8),
                           ),
                         ),
@@ -163,7 +163,7 @@ class _ModeCardState extends State<ModeCard>
                 child: Text(
                   widget.modeInfo.title,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 19,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFF1E293B),
                   ),

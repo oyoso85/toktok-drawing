@@ -84,7 +84,7 @@ class TraceDrawingNotifier extends Notifier<TraceDrawingState> {
     switch (state.selectedTool) {
       case DrawingTool.rainbowBrush:
         final stroke = current as RainbowStroke;
-        if (stroke.points.isNotEmpty && (point - stroke.points.last).distance < 2.0) break;
+        if (stroke.points.isNotEmpty && (point - stroke.points.last).distance < 4.0) break;
         final elapsedMs = state.strokeStartTime != null
             ? DateTime.now().difference(state.strokeStartTime!).inMilliseconds
             : 0;
@@ -112,7 +112,7 @@ class TraceDrawingNotifier extends Notifier<TraceDrawingState> {
 
       default:
         if (current is RainbowStroke) {
-          if (current.points.isNotEmpty && (point - current.points.last).distance < 2.0) break;
+          if (current.points.isNotEmpty && (point - current.points.last).distance < 4.0) break;
           final elapsedMs = state.strokeStartTime != null
               ? DateTime.now().difference(state.strokeStartTime!).inMilliseconds
               : 0;

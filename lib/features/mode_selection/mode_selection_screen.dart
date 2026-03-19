@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:toktok_drawing/core/constants/app_colors.dart';
 import 'package:toktok_drawing/features/drawing/placeholder_drawing_screen.dart';
 import 'package:toktok_drawing/features/free_drawing/free_drawing_screen.dart';
@@ -33,10 +34,10 @@ class ModeSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          const _BgCircles(),
+          SvgPicture.asset('assets/main/bg-farm.svg', fit: BoxFit.cover),
           SafeArea(
             child: Column(
               children: [
@@ -54,48 +55,6 @@ class ModeSelectionScreen extends StatelessWidget {
   }
 }
 
-// ── 배경 장식 원 ─────────────────────────────────────────────────────────────
-
-class _BgCircles extends StatelessWidget {
-  const _BgCircles();
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned(
-          top: -80,
-          left: -80,
-          child: _Circle(320, _kPrimary.withValues(alpha: 0.25)),
-        ),
-        Positioned(
-          top: MediaQuery.of(context).size.height / 2,
-          right: -80,
-          child: _Circle(240, _kPrimary.withValues(alpha: 0.15)),
-        ),
-        Positioned(
-          bottom: -80,
-          left: MediaQuery.of(context).size.width / 4,
-          child: _Circle(380, _kPrimary.withValues(alpha: 0.20)),
-        ),
-      ],
-    );
-  }
-}
-
-class _Circle extends StatelessWidget {
-  final double size;
-  final Color color;
-  const _Circle(this.size, this.color);
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      );
-}
-
 // ── 상단 앱바 ────────────────────────────────────────────────────────────────
 
 class _TopBar extends StatelessWidget {
@@ -103,19 +62,36 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.of(context).size.height < 450;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: isCompact ? 8 : 10),
       child: Row(
         children: [
-          _RoundButton(icon: Icons.home_rounded, onTap: () {}),
-          const Expanded(child: _Title()),
-          const _ScoreBadge(score: 1240),
-          const SizedBox(width: 12),
-          _RoundButton(
-            icon: Icons.settings_rounded,
-            iconColor: Colors.grey.shade500,
-            borderColor: Colors.grey.shade200,
-            onTap: () {},
+          // 좌측 그룹 (homeBtn + scoreBadge)
+          Expanded(
+            child: Row(
+              children: [
+                _RoundButton(icon: Icons.home_rounded, onTap: () {}),
+                const SizedBox(width: 12),
+                const _ScoreBadge(score: 1240),
+              ],
+            ),
+          ),
+          // 중앙 타이틀
+          const _Title(),
+          // 우측 그룹 (settingsBtn)
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _RoundButton(
+                  icon: Icons.settings_rounded,
+                  iconColor: Colors.grey.shade500,
+                  borderColor: Colors.grey.shade200,
+                  onTap: () {},
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -257,7 +233,11 @@ class _ScoreBadge extends StatelessWidget {
   }
 }
 
-// ── 본문: 좌(마스코트) + 우(카드 2줄) ──────────────────────────────────────────
+// ── 본문: 좌(마스코트) + 우(카드 열 가로 스크롤) ────────────────────────────
+
+const _kCardSize = 165.0;
+const _kCardGap = 24.0;
+const _kLockedCount = 3;
 
 class _Body extends StatefulWidget {
   final void Function(ModeInfo) onTap;
@@ -285,69 +265,232 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  Animation<double> _fadeAnim(int index) => CurvedAnimation(
-        parent: _ctrl,
-        curve: Interval(index * 0.15, (index * 0.15 + 0.6).clamp(0, 1),
-            curve: Curves.easeOut),
-      );
-
-  Animation<Offset> _slideAnim(int index) => Tween<Offset>(
-        begin: const Offset(0, 0.12),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: _ctrl,
-        curve: Interval(index * 0.15, (index * 0.15 + 0.6).clamp(0, 1),
-            curve: Curves.easeOut),
-      ));
-
   @override
   Widget build(BuildContext context) {
     final modes = ModeInfo.registry;
-    final hasThreeRows = modes.length > 4;
-    final cardHeight = hasThreeRows ? 120.0 : 160.0;
-    final rowGap = hasThreeRows ? 10.0 : 14.0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 0, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 좌: 마스코트 (화면의 약 30%)
+          // 좌: 마스코트
           SizedBox(
             width: MediaQuery.of(context).size.width * 0.30,
             child: const _MascotColumn(),
           ),
           const SizedBox(width: 16),
-          // 우: 카드 2~3줄 (가로 스크롤)
+          // 우: 열 기반 가로 스크롤 카드
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _CardRow(
-                  modes: modes.take(2).toList(),
-                  onTap: widget.onTap,
-                  fadeAnim: _fadeAnim(0),
-                  slideAnim: _slideAnim(0),
-                  cardHeight: cardHeight,
-                ),
-                SizedBox(height: rowGap),
-                _CardRow(
-                  modes: modes.skip(2).take(2).toList(),
-                  onTap: widget.onTap,
-                  fadeAnim: _fadeAnim(2),
-                  slideAnim: _slideAnim(2),
-                  cardHeight: cardHeight,
-                ),
-                if (hasThreeRows) ...[
-                  SizedBox(height: rowGap),
-                  _CardRow(
-                    modes: modes.skip(4).toList(),
-                    onTap: widget.onTap,
-                    fadeAnim: _fadeAnim(4),
-                    slideAnim: _slideAnim(4),
-                    cardHeight: cardHeight,
+            child: Center(
+              child: SizedBox(
+                height: _kCardSize * 2 + _kCardGap + 32,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.none,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // col1: mode[0] (상) + mode[2] (하)
+                      _ModeCardColumn(
+                        top: modes[0],
+                        bottom: modes[2],
+                        onTap: widget.onTap,
+                        colIndex: 0,
+                        ctrl: _ctrl,
+                      ),
+                      const SizedBox(width: _kCardGap),
+                      // col2: mode[1] (상) + mode[3] (하)
+                      _ModeCardColumn(
+                        top: modes[1],
+                        bottom: modes[3],
+                        onTap: widget.onTap,
+                        colIndex: 1,
+                        ctrl: _ctrl,
+                      ),
+                      const SizedBox(width: _kCardGap),
+                      // col3: mode[4] (상) + locked (하)
+                      _MixedCardColumn(
+                        top: modes[4],
+                        onTap: widget.onTap,
+                        colIndex: 2,
+                        ctrl: _ctrl,
+                      ),
+                      // 오픈 예정 열 2개
+                      ...List.generate(_kLockedCount - 1, (i) => Row(
+                        children: [
+                          const SizedBox(width: _kCardGap),
+                          const _LockedCardColumn(),
+                        ],
+                      )),
+                    ],
                   ),
-                ],
-              ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeCardColumn extends StatelessWidget {
+  final ModeInfo top, bottom;
+  final void Function(ModeInfo) onTap;
+  final int colIndex;
+  final AnimationController ctrl;
+
+  const _ModeCardColumn({
+    required this.top,
+    required this.bottom,
+    required this.onTap,
+    required this.colIndex,
+    required this.ctrl,
+  });
+
+  Animation<double> _fade(int i) => CurvedAnimation(
+        parent: ctrl,
+        curve: Interval(i * 0.15, (i * 0.15 + 0.6).clamp(0, 1),
+            curve: Curves.easeOut),
+      );
+
+  Animation<Offset> _slide(int i) => Tween<Offset>(
+        begin: const Offset(0, 0.12),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: ctrl,
+        curve: Interval(i * 0.15, (i * 0.15 + 0.6).clamp(0, 1),
+            curve: Curves.easeOut),
+      ));
+
+  @override
+  Widget build(BuildContext context) {
+    final topIdx = colIndex * 2;
+    final botIdx = colIndex * 2 + 1;
+    return Column(
+      children: [
+        FadeTransition(
+          opacity: _fade(topIdx),
+          child: SlideTransition(
+            position: _slide(topIdx),
+            child: SizedBox(
+              width: _kCardSize, height: _kCardSize,
+              child: ModeCard(modeInfo: top, index: topIdx, onTap: () => onTap(top)),
+            ),
+          ),
+        ),
+        const SizedBox(height: _kCardGap),
+        FadeTransition(
+          opacity: _fade(botIdx),
+          child: SlideTransition(
+            position: _slide(botIdx),
+            child: SizedBox(
+              width: _kCardSize, height: _kCardSize,
+              child: ModeCard(modeInfo: bottom, index: botIdx, onTap: () => onTap(bottom)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 상단: 활성 카드 1개, 하단: 잠금 카드 1개
+class _MixedCardColumn extends StatelessWidget {
+  final ModeInfo top;
+  final void Function(ModeInfo) onTap;
+  final int colIndex;
+  final AnimationController ctrl;
+
+  const _MixedCardColumn({
+    required this.top,
+    required this.onTap,
+    required this.colIndex,
+    required this.ctrl,
+  });
+
+  Animation<double> _fade(int i) => CurvedAnimation(
+        parent: ctrl,
+        curve: Interval(i * 0.15, (i * 0.15 + 0.6).clamp(0, 1),
+            curve: Curves.easeOut),
+      );
+
+  Animation<Offset> _slide(int i) => Tween<Offset>(
+        begin: const Offset(0, 0.12),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: ctrl,
+        curve: Interval(i * 0.15, (i * 0.15 + 0.6).clamp(0, 1),
+            curve: Curves.easeOut),
+      ));
+
+  @override
+  Widget build(BuildContext context) {
+    final topIdx = colIndex * 2;
+    return Column(
+      children: [
+        FadeTransition(
+          opacity: _fade(topIdx),
+          child: SlideTransition(
+            position: _slide(topIdx),
+            child: SizedBox(
+              width: _kCardSize, height: _kCardSize,
+              child: ModeCard(modeInfo: top, index: topIdx, onTap: () => onTap(top)),
+            ),
+          ),
+        ),
+        const SizedBox(height: _kCardGap),
+        const _LockedCard(),
+      ],
+    );
+  }
+}
+
+class _LockedCardColumn extends StatelessWidget {
+  const _LockedCardColumn();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const _LockedCard(),
+        const SizedBox(height: _kCardGap),
+        const _LockedCard(),
+      ],
+    );
+  }
+}
+
+class _LockedCard extends StatelessWidget {
+  const _LockedCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _kCardSize,
+      height: _kCardSize,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEBEBEB),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.lock_rounded, size: 42, color: Colors.grey.shade400),
+          const SizedBox(height: 8),
+          Text(
+            '오픈 예정',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade400,
             ),
           ),
         ],
@@ -393,85 +536,16 @@ class _MascotColumnState extends State<_MascotColumn>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // 마스코트 이미지 (pulsing) - Flexible로 남은 공간만큼만 차지
         Flexible(
           child: ScaleTransition(
             scale: _scaleAnim,
-            child: Image.asset(
-              'assets/images/mascot.png',
+            child: SvgPicture.asset(
+              'assets/main/main-character.svg',
               fit: BoxFit.contain,
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        // LET'S DRAW! 버튼
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(99),
-            border: Border.all(color: _kPrimary, width: 3),
-            boxShadow: [
-              BoxShadow(
-                color: _kPrimary.withValues(alpha: 0.35),
-                offset: const Offset(0, 5),
-                blurRadius: 0,
-              ),
-            ],
-          ),
-          child: const Text(
-            "LET'S DRAW!",
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              color: _kPrimary,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
       ],
-    );
-  }
-}
-
-// ── 카드 행 (가로 스크롤) ─────────────────────────────────────────────────────
-
-class _CardRow extends StatelessWidget {
-  final List<ModeInfo> modes;
-  final void Function(ModeInfo) onTap;
-  final Animation<double> fadeAnim;
-  final Animation<Offset> slideAnim;
-  final double cardHeight;
-
-  const _CardRow({
-    required this.modes,
-    required this.onTap,
-    required this.fadeAnim,
-    required this.slideAnim,
-    this.cardHeight = 160,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: fadeAnim,
-      child: SlideTransition(
-        position: slideAnim,
-        child: SizedBox(
-          height: cardHeight,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: modes.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => ModeCard(
-              modeInfo: modes[i],
-              index: i,
-              onTap: () => onTap(modes[i]),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -492,62 +566,51 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          child: Row(
-            children: [
-              _PillButton(
-                icon: Icons.photo_library_rounded,
-                label: '내 갤러리',
-                onTap: () => _snack(context),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 10, right: 10, bottom: 10, top: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _PillButton(
+              icon: Icons.photo_library_rounded,
+              label: '내 갤러리',
+              onTap: () => _snack(context),
+            ),
+            const SizedBox(width: 12),
+            _PillButton(
+              icon: Icons.star_rounded,
+              label: 'Daily Challenge',
+              onTap: () => _snack(context),
+            ),
+            const Spacer(),
+            Text(
+              '열심히 그려봐요! ',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                fontStyle: FontStyle.italic,
+                color: Colors.grey.shade400,
               ),
-              const SizedBox(width: 12),
-              _PillButton(
-                icon: Icons.star_rounded,
-                label: 'Daily Challenge',
-                onTap: () => _snack(context),
-              ),
-              const Spacer(),
-              Text(
-                '열심히 그려봐요! ',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.grey.shade400,
+            ),
+            GestureDetector(
+              onTap: () => _snack(context),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: _kPrimary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 20,
                 ),
               ),
-              GestureDetector(
-                onTap: () => _snack(context),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: _kPrimary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.arrow_forward_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -572,12 +635,15 @@ class _PillButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: _kPrimary.withValues(alpha: 0.15),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(99),
           border: Border.all(
             color: _kPrimary.withValues(alpha: 0.3),
-            width: 2,
+            width: 3,
           ),
+          boxShadow: const [
+            BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

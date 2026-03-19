@@ -34,6 +34,9 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen>
   bool _showCompletionOverlay = false;
   bool _showNextButton = false;
 
+  int _strokeCount = 0;
+  bool _showEarlyNextButton = false;
+
   Size? _lastInitializedSize;
   int _lastInitializedIndex = -1;
 
@@ -91,6 +94,8 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen>
       _showingList = false;
       _showCompletionOverlay = false;
       _showNextButton = false;
+      _strokeCount = 0;
+      _showEarlyNextButton = false;
       _lastInitializedSize = null;
       _lastInitializedIndex = -1;
     });
@@ -143,6 +148,8 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen>
       _currentIndex = nextIndex;
       _showCompletionOverlay = false;
       _showNextButton = false;
+      _strokeCount = 0;
+      _showEarlyNextButton = false;
       _animatingObjects.clear();
       _lastInitializedSize = null;
       _lastInitializedIndex = -1;
@@ -173,9 +180,18 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen>
         final newObjects = nextCurrent.objects.skip(prevCount).toList();
         if (newObjects.isNotEmpty) setState(() => _animatingObjects.addAll(newObjects));
       }
+      // 스트로크 완료 감지: elements 리스트가 늘면 한 획이 완성된 것
+      final prevLen = prev?.elements.length ?? 0;
+      final nextLen = next.elements.length;
+      if (nextLen > prevLen && !next.isCompleted && !_showEarlyNextButton) {
+        _strokeCount += nextLen - prevLen;
+        if (_strokeCount >= 2) {
+          setState(() => _showEarlyNextButton = true);
+        }
+      }
       if (!(prev?.isCompleted ?? false) && next.isCompleted) {
         // 완성: confetti + 일러스트 reveal + 스트로크 fade-out 동시 시작
-        setState(() { _showCompletionOverlay = true; _showNextButton = false; });
+        setState(() { _showCompletionOverlay = true; _showNextButton = false; _showEarlyNextButton = false; });
         _completionCtrl.forward();
       }
     });
@@ -233,6 +249,17 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen>
                           if (mounted) setState(() => _animatingObjects.remove(obj));
                         },
                       )),
+                  // 2획 후 오른쪽 위에서 슬라이드로 나타나는 다음 버튼
+                  Positioned(
+                    top: 16,
+                    right: 0,
+                    child: AnimatedSlide(
+                      offset: _showEarlyNextButton ? Offset.zero : const Offset(1.5, 0),
+                      duration: const Duration(milliseconds: 450),
+                      curve: Curves.easeOut,
+                      child: _EarlyNextButton(onTap: _goNextTemplate),
+                    ),
+                  ),
                   if (_showCompletionOverlay)
                     CompletionOverlay(
                       onDone: () {
@@ -292,6 +319,44 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen>
               onUndo: notifier.undo,
               onRedo: notifier.redo,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── 조기 다음 버튼 (2획 후 오른쪽 위 슬라이드) ────────────────────────────────
+class _EarlyNextButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _EarlyNextButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.only(left: 20, right: 12, top: 12, bottom: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF4CAF50),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(28),
+            bottomLeft: Radius.circular(28),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4CAF50).withValues(alpha: 0.4),
+              offset: const Offset(-2, 4),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('다음', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+            SizedBox(width: 6),
+            Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
           ],
         ),
       ),

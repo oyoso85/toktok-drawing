@@ -81,9 +81,9 @@ class FreeDrawingNotifier extends Notifier<FreeDrawingState> {
     switch (state.selectedTool) {
       case DrawingTool.rainbowBrush:
         final stroke = current as RainbowStroke;
-        // 직전 포인트와 너무 가까우면 무시 (시작점 중복 방지)
+        // 직전 포인트와 너무 가까우면 무시 (포인트 밀도 제한 → 성능)
         if (stroke.points.isNotEmpty &&
-            (point - stroke.points.last).distance < 2.0) break;
+            (point - stroke.points.last).distance < 4.0) break;
         final elapsedMs = state.strokeStartTime != null
             ? DateTime.now().difference(state.strokeStartTime!).inMilliseconds
             : 0;
@@ -117,7 +117,7 @@ class FreeDrawingNotifier extends Notifier<FreeDrawingState> {
         if (current is RainbowStroke) {
           // 일반 도구 + 무지개 색 → RainbowStroke 포인트 추가
           if (current.points.isNotEmpty &&
-              (point - current.points.last).distance < 2.0) break;
+              (point - current.points.last).distance < 4.0) break;
           final elapsedMs = state.strokeStartTime != null
               ? DateTime.now().difference(state.strokeStartTime!).inMilliseconds
               : 0;
