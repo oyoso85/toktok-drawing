@@ -146,7 +146,7 @@ class _ModeCardState extends State<ModeCard>
                         child: Center(
                           child: Icon(
                             widget.modeInfo.icon,
-                            size: 56,
+                            size: 84,
                             color: _kPrimary.withValues(alpha: 0.8),
                           ),
                         ),
@@ -163,7 +163,7 @@ class _ModeCardState extends State<ModeCard>
                 child: Text(
                   widget.modeInfo.title,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 19,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFF1E293B),
                   ),

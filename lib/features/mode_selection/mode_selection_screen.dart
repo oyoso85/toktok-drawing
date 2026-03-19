@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:toktok_drawing/core/constants/app_colors.dart';
 import 'package:toktok_drawing/features/drawing/placeholder_drawing_screen.dart';
 import 'package:toktok_drawing/features/free_drawing/free_drawing_screen.dart';
@@ -36,7 +37,7 @@ class ModeSelectionScreen extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset('assets/images/main-bg.png', fit: BoxFit.cover),
+          SvgPicture.asset('assets/main/bg-farm.svg', fit: BoxFit.cover),
           SafeArea(
             child: Column(
               children: [
@@ -234,7 +235,7 @@ class _ScoreBadge extends StatelessWidget {
 
 // ── 본문: 좌(마스코트) + 우(카드 열 가로 스크롤) ────────────────────────────
 
-const _kCardSize = 110.0;
+const _kCardSize = 165.0;
 const _kCardGap = 24.0;
 const _kLockedCount = 3;
 
@@ -282,10 +283,11 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
           Expanded(
             child: Center(
               child: SizedBox(
-                height: _kCardSize * 2 + _kCardGap,
+                height: _kCardSize * 2 + _kCardGap + 32,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  clipBehavior: Clip.none,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -306,8 +308,16 @@ class _BodyState extends State<_Body> with SingleTickerProviderStateMixin {
                         colIndex: 1,
                         ctrl: _ctrl,
                       ),
-                      // 오픈 예정 열 3개
-                      ...List.generate(_kLockedCount, (i) => Row(
+                      const SizedBox(width: _kCardGap),
+                      // col3: mode[4] (상) + locked (하)
+                      _MixedCardColumn(
+                        top: modes[4],
+                        onTap: widget.onTap,
+                        colIndex: 2,
+                        ctrl: _ctrl,
+                      ),
+                      // 오픈 예정 열 2개
+                      ...List.generate(_kLockedCount - 1, (i) => Row(
                         children: [
                           const SizedBox(width: _kCardGap),
                           const _LockedCardColumn(),
@@ -386,6 +396,57 @@ class _ModeCardColumn extends StatelessWidget {
   }
 }
 
+/// 상단: 활성 카드 1개, 하단: 잠금 카드 1개
+class _MixedCardColumn extends StatelessWidget {
+  final ModeInfo top;
+  final void Function(ModeInfo) onTap;
+  final int colIndex;
+  final AnimationController ctrl;
+
+  const _MixedCardColumn({
+    required this.top,
+    required this.onTap,
+    required this.colIndex,
+    required this.ctrl,
+  });
+
+  Animation<double> _fade(int i) => CurvedAnimation(
+        parent: ctrl,
+        curve: Interval(i * 0.15, (i * 0.15 + 0.6).clamp(0, 1),
+            curve: Curves.easeOut),
+      );
+
+  Animation<Offset> _slide(int i) => Tween<Offset>(
+        begin: const Offset(0, 0.12),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: ctrl,
+        curve: Interval(i * 0.15, (i * 0.15 + 0.6).clamp(0, 1),
+            curve: Curves.easeOut),
+      ));
+
+  @override
+  Widget build(BuildContext context) {
+    final topIdx = colIndex * 2;
+    return Column(
+      children: [
+        FadeTransition(
+          opacity: _fade(topIdx),
+          child: SlideTransition(
+            position: _slide(topIdx),
+            child: SizedBox(
+              width: _kCardSize, height: _kCardSize,
+              child: ModeCard(modeInfo: top, index: topIdx, onTap: () => onTap(top)),
+            ),
+          ),
+        ),
+        const SizedBox(height: _kCardGap),
+        const _LockedCard(),
+      ],
+    );
+  }
+}
+
 class _LockedCardColumn extends StatelessWidget {
   const _LockedCardColumn();
 
@@ -422,12 +483,12 @@ class _LockedCard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.lock_rounded, size: 28, color: Colors.grey.shade400),
+          Icon(Icons.lock_rounded, size: 42, color: Colors.grey.shade400),
           const SizedBox(height: 8),
           Text(
             '오픈 예정',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.grey.shade400,
             ),
@@ -478,38 +539,12 @@ class _MascotColumnState extends State<_MascotColumn>
         Flexible(
           child: ScaleTransition(
             scale: _scaleAnim,
-            child: Image.asset(
-              'assets/images/elephant.png',
+            child: SvgPicture.asset(
+              'assets/main/main-character.svg',
               fit: BoxFit.contain,
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(99),
-            border: Border.all(color: _kPrimary, width: 3),
-            boxShadow: [
-              BoxShadow(
-                color: _kPrimary.withValues(alpha: 0.35),
-                offset: const Offset(0, 5),
-                blurRadius: 0,
-              ),
-            ],
-          ),
-          child: const Text(
-            "LET'S DRAW!",
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              color: _kPrimary,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
       ],
     );
   }

@@ -218,6 +218,10 @@ mixin StrokePainterMixin {
       _drawRainbowBrush(canvas, stroke);
       return;
     }
+    if (stroke.tool == DrawingTool.pen || stroke.tool == DrawingTool.pencil) {
+      _drawRainbowPen(canvas, stroke);
+      return;
+    }
     if (stroke.points.length == 1) {
       canvas.drawCircle(stroke.points[0], stroke.size / 2,
           Paint()
@@ -249,6 +253,37 @@ mixin StrokePainterMixin {
         Paint()..color = endColor..style = PaintingStyle.fill);
 
     if (hasBlur) canvas.restore();
+  }
+
+  void _drawRainbowPen(Canvas canvas, RainbowStroke stroke) {
+    if (stroke.points.length == 1) {
+      final color = stroke.colors.isNotEmpty ? stroke.colors[0] : const Color(0xFFFF0000);
+      canvas.drawCircle(stroke.points[0], stroke.size / 2,
+          Paint()..color = color..style = PaintingStyle.fill);
+      return;
+    }
+    drawRainbowPenSegmentRange(canvas, stroke, 0, stroke.points.length - 1);
+  }
+
+  /// [fromSeg, toSeg) 범위의 세그먼트를 drawLine + StrokeCap.round 로 렌더.
+  /// drawVertices 삼각형 스트립과 달리 꺾임 부위에 네모난 끊김이 없다.
+  void drawRainbowPenSegmentRange(
+      Canvas canvas, RainbowStroke stroke, int fromSeg, int toSeg) {
+    final end = math.min(toSeg, stroke.points.length - 1);
+    if (end <= fromSeg) return;
+    final paint = Paint()
+      ..strokeWidth = stroke.size
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    for (int i = fromSeg; i < end; i++) {
+      final p0 = stroke.points[i];
+      final p1 = stroke.points[i + 1];
+      if ((p1 - p0).distance < 0.5) continue;
+      final c0 = i < stroke.colors.length ? stroke.colors[i] : stroke.colors.last;
+      final c1 = (i + 1) < stroke.colors.length ? stroke.colors[i + 1] : c0;
+      canvas.drawLine(p0, p1,
+          paint..shader = ui.Gradient.linear(p0, p1, [c0, c1]));
+    }
   }
 
   void _drawRainbowBrush(Canvas canvas, RainbowStroke stroke) {

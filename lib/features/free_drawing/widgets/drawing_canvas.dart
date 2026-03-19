@@ -172,8 +172,12 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
           Paint()..color = startColor..style = PaintingStyle.fill);
     }
 
-    // drawVertices 1 call → O(1) GPU draw call
-    renderer.drawRainbowSegmentRange(c, stroke, _checkpointSegCount, upToSeg);
+    // 펜/색연필: drawLine + StrokeCap.round, 기타: drawVertices
+    if (stroke.tool == DrawingTool.pen || stroke.tool == DrawingTool.pencil) {
+      renderer.drawRainbowPenSegmentRange(c, stroke, _checkpointSegCount, upToSeg);
+    } else {
+      renderer.drawRainbowSegmentRange(c, stroke, _checkpointSegCount, upToSeg);
+    }
 
     final picture = recorder.endRecording();
     final oldImage = _rainbowImage;
@@ -346,11 +350,17 @@ class _CanvasPainter extends CustomPainter with StrokePainterMixin {
     }
   }
 
-  /// 체크포인트 이후 미구운 세그먼트를 drawVertices 1 call로 렌더.
+  /// 체크포인트 이후 미구운 세그먼트를 렌더.
+  /// 펜/색연필: drawLine + StrokeCap.round (꺾임 부위 끊김 없음)
+  /// 기타(무지개붓 기본값): drawVertices 삼각형 스트립
   void _drawPendingSegments(Canvas canvas, RainbowStroke stroke) {
     final totalSeg = stroke.points.length - 1;
     if (totalSeg <= checkpointSegCount) return;
-    drawRainbowSegmentRange(canvas, stroke, checkpointSegCount, totalSeg);
+    if (stroke.tool == DrawingTool.pen || stroke.tool == DrawingTool.pencil) {
+      drawRainbowPenSegmentRange(canvas, stroke, checkpointSegCount, totalSeg);
+    } else {
+      drawRainbowSegmentRange(canvas, stroke, checkpointSegCount, totalSeg);
+    }
   }
 
   /// 끝 캡: 매 프레임 마지막 포인트 색상으로 재렌더
