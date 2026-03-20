@@ -102,6 +102,7 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
   bool _showingCompletion = false;
   bool _showingPopup = false;
   bool _showEarlyNextButton = false;
+  bool _showAutoCompleteButton = false;
 
   // ── 디버그: 단면 순서 자동 채우기 ──────────────────────────────────────────
   Timer? _debugTimer;
@@ -189,10 +190,16 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
     }
   }
 
+  void _autoComplete() {
+    ref.read(coloringProvider.notifier).fillAllRemaining();
+    setState(() => _showAutoCompleteButton = false);
+  }
+
   void _replay() {
     setState(() {
       _showingPopup = false;
       _showEarlyNextButton = false;
+      _showAutoCompleteButton = false;
     });
     ref.read(coloringProvider.notifier).initPaths(widget.svgAssetPath);
   }
@@ -205,16 +212,25 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
         setState(() {
           _showingCompletion = true;
           _showEarlyNextButton = false;
+          _showAutoCompleteButton = false;
         });
       }
     });
 
-    // 2번 색칠 후 다음 버튼 표시
-    ref.listen(coloringProvider.select((s) => s.filledPaths.length), (_, filled) {
-      if (!_showEarlyNextButton && filled >= 2) {
-        setState(() => _showEarlyNextButton = true);
-      }
-    });
+    // 2번 색칠 후 다음 버튼 표시 / 90% 이상 채우면 자동완성 버튼 표시
+    ref.listen(
+      coloringProvider.select((s) => (filled: s.filledPaths.length, total: s.interactivePaths.length)),
+      (_, val) {
+        final filled = val.filled;
+        final total = val.total;
+        if (!_showEarlyNextButton && filled >= 2) {
+          setState(() => _showEarlyNextButton = true);
+        }
+        if (total > 0 && !_showAutoCompleteButton && filled < total && filled >= (total * 0.9).ceil()) {
+          setState(() => _showAutoCompleteButton = true);
+        }
+      },
+    );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -275,6 +291,17 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
                     duration: const Duration(milliseconds: 450),
                     curve: Curves.easeOut,
                     child: _EarlyNextButton(onTap: _goNext),
+                  ),
+                ),
+                // 90% 이상 채우면 나타나는 자동완성 버튼 (다음 버튼 아래)
+                Positioned(
+                  top: 80,
+                  right: 0,
+                  child: AnimatedSlide(
+                    offset: _showAutoCompleteButton ? Offset.zero : const Offset(1.5, 0),
+                    duration: const Duration(milliseconds: 450),
+                    curve: Curves.easeOut,
+                    child: _AutoCompleteButton(onTap: _autoComplete),
                   ),
                 ),
                 if (_showingCompletion)
@@ -346,6 +373,44 @@ class _EarlyNextButton extends StatelessWidget {
             Text('다음', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
             SizedBox(width: 6),
             Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── 자동완성 버튼 (90% 이상 채웠을 때) ──────────────────────────────────────────
+class _AutoCompleteButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AutoCompleteButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.only(left: 20, right: 12, top: 12, bottom: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF4CAF50),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(28),
+            bottomLeft: Radius.circular(28),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4CAF50).withValues(alpha: 0.4),
+              offset: const Offset(-2, 4),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('완성', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+            SizedBox(width: 6),
+            Icon(Icons.auto_fix_high_rounded, color: Colors.white, size: 20),
           ],
         ),
       ),

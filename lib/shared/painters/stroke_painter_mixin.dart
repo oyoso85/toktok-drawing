@@ -36,6 +36,10 @@ mixin StrokePainterMixin {
         _drawBrush(canvas, stroke);
       case DrawingTool.pencil:
         _drawPencil(canvas, stroke);
+      case DrawingTool.dryPencil:
+        _drawDryPencil(canvas, stroke);
+      case DrawingTool.watercolorPencil:
+        _drawWatercolorPencil(canvas, stroke);
       case DrawingTool.eraser:
         _drawEraser(canvas, stroke);
       default:
@@ -141,17 +145,106 @@ mixin StrokePainterMixin {
     );
     if (outline.isEmpty) return;
 
-    shader.setFloat(0, stroke.size);
-    final c = stroke.color;
-    final a = c.a;
-    shader.setFloat(1, c.r * a);
-    shader.setFloat(2, c.g * a);
-    shader.setFloat(3, c.b * a);
-    shader.setFloat(4, a);
+    _setShaderColor(shader, stroke.color, stroke.size, 0.0);
 
     canvas.drawPath(outlinePath(outline), Paint()
       ..style = PaintingStyle.fill
       ..shader = shader);
+  }
+
+  // ── 공통: shader uniform 설정 헬퍼 ──────────────────────────────────────────
+  void _setShaderColor(ui.FragmentShader shader, Color color, double strokeWidth, double style) {
+    shader.setFloat(0, strokeWidth);
+    final a = color.a;
+    shader.setFloat(1, color.r * a);
+    shader.setFloat(2, color.g * a);
+    shader.setFloat(3, color.b * a);
+    shader.setFloat(4, a);
+    shader.setFloat(5, style);
+  }
+
+  // ── 건조한 텍스쳐 (Dry / Charcoal) ──────────────────────────────────────────
+  void _drawDryPencil(Canvas canvas, Stroke stroke) {
+    if (stroke.points.isEmpty) return;
+    if (pencilProgram == null) {
+      _drawPencil(canvas, stroke);
+      return;
+    }
+    final points = stroke.points;
+    if (points.length == 1) {
+      canvas.drawCircle(points[0], stroke.size * 0.5, Paint()
+        ..color = stroke.color.withValues(alpha: 0.85)
+        ..style = PaintingStyle.fill);
+      return;
+    }
+
+    final outline = getStroke(
+      points.map((p) => PointVector(p.dx, p.dy)).toList(),
+      options: StrokeOptions(
+        size: stroke.size,      // full size — 건조 도구는 넓고 일정한 폭
+        thinning: 0.2,          // 폭 변화 적게 (목탄을 옆으로 눕혀 칠하는 느낌)
+        smoothing: 0.3,
+        streamline: 0.4,
+        simulatePressure: true,
+      ),
+    );
+    if (outline.isEmpty) return;
+
+    final shader = pencilProgram!.fragmentShader();
+    _setShaderColor(shader, stroke.color, stroke.size, 1.0);
+
+    canvas.drawPath(outlinePath(outline), Paint()
+      ..style = PaintingStyle.fill
+      ..shader = shader);
+  }
+
+  // ── 수채화 (Watercolor) ──────────────────────────────────────────────────────
+  void _drawWatercolorPencil(Canvas canvas, Stroke stroke) {
+    if (stroke.points.isEmpty) return;
+    final points = stroke.points;
+
+    if (points.length == 1) {
+      canvas.drawCircle(points[0], stroke.size * 0.65, Paint()
+        ..color = stroke.color.withValues(alpha: 0.28)
+        ..style = PaintingStyle.fill
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.size * 0.55));
+      return;
+    }
+
+    final outline = getStroke(
+      points.map((p) => PointVector(p.dx, p.dy)).toList(),
+      options: StrokeOptions(
+        size: stroke.size * 1.4,   // 수채화는 번지듯 더 넓게
+        thinning: 0.5,
+        smoothing: 0.6,
+        streamline: 0.6,
+        simulatePressure: true,
+      ),
+    );
+    if (outline.isEmpty) return;
+
+    final path = outlinePath(outline);
+    final blurSigma = stroke.size * 0.45;
+
+    // saveLayer + blur → 가장자리 번짐 효과
+    canvas.saveLayer(
+      null,
+      Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+    );
+
+    if (pencilProgram != null) {
+      final shader = pencilProgram!.fragmentShader();
+      _setShaderColor(shader, stroke.color, stroke.size, 2.0);
+      canvas.drawPath(path, Paint()
+        ..style = PaintingStyle.fill
+        ..shader = shader);
+    } else {
+      canvas.drawPath(path, Paint()
+        ..color = stroke.color.withValues(alpha: 0.32)
+        ..style = PaintingStyle.fill);
+    }
+
+    canvas.restore();
   }
 
   void _drawEraser(Canvas canvas, Stroke stroke) {

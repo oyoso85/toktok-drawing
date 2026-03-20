@@ -42,12 +42,20 @@ class ColoringNotifier extends Notifier<ColoringState> {
     );
   }
 
-  void selectColor(Color color) {
-    state = state.copyWith(selectedColor: color);
+  /// 아직 채워지지 않은 모든 interactive path를 원본 색상으로 채움 (자동 완성).
+  void fillAllRemaining() {
+    final updated = Map<int, Color>.from(state.filledPaths);
+    for (final p in state.interactivePaths) {
+      updated.putIfAbsent(p.index, () => p.fillColor);
+    }
+    state = state.copyWith(
+      filledPaths: updated,
+      isCompleted: true,
+    );
   }
 
-  void setAnimating(bool value) {
-    state = state.copyWith(isAnimating: value);
+  void selectColor(Color color) {
+    state = state.copyWith(selectedColor: color);
   }
 
   void resetCompletion() {

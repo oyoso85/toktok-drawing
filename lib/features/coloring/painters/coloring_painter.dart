@@ -1,14 +1,13 @@
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:toktok_drawing/features/coloring/animations/fill_animation_painter.dart';
+import 'package:toktok_drawing/features/coloring/animations/active_fill_animation.dart';
 import 'package:toktok_drawing/features/coloring/models/coloring_path.dart';
 
 /// 색칠 캔버스 CustomPainter.
 /// - 미채움 인터랙티브 path: 흰색 fill + 검정 stroke + hintOpacity 힌트 색상
 /// - 채워진 path: 사용자가 선택한 색상 (filledPaths[index])
 /// - 소형/흰색 path: SVG 원본 fill 색상 (항상)
-/// - 진행 중 애니메이션: targetPath 위에 클리핑되어 렌더
+/// - 진행 중 애니메이션: 각 targetPath 위에 클리핑되어 동시 렌더
 class ColoringPainter extends CustomPainter {
   final List<ColoringPath> paths;
   final Map<int, Color> filledPaths;
@@ -16,22 +15,14 @@ class ColoringPainter extends CustomPainter {
   /// 미채움 단면에 원본 색을 얼마나 비쳐 보이게 할지 (0.0 ~ 0.10).
   final double hintOpacity;
 
-  final FillAnimationPainter? activeAnimation;
-  final ui.Path? animationTargetPath;
-  final Color? animationFillColor;
-  final Offset? animationTapOffset;
-  final double animationT;
+  final List<ActiveFillAnimation> activeAnimations;
   final Float64List? transformMatrix;
 
   const ColoringPainter({
     required this.paths,
     required this.filledPaths,
     this.hintOpacity = 0.0,
-    this.activeAnimation,
-    this.animationTargetPath,
-    this.animationFillColor,
-    this.animationTapOffset,
-    this.animationT = 0.0,
+    this.activeAnimations = const [],
     this.transformMatrix,
   });
 
@@ -82,18 +73,15 @@ class ColoringPainter extends CustomPainter {
       }
     }
 
-    // 진행 중인 채우기 애니메이션
-    if (activeAnimation != null &&
-        animationTargetPath != null &&
-        animationFillColor != null &&
-        animationTapOffset != null) {
-      activeAnimation!.paint(
+    // 진행 중인 채우기 애니메이션 (여러 개 동시 렌더)
+    for (final anim in activeAnimations) {
+      anim.painter.paint(
         canvas,
         size,
-        animationTargetPath!,
-        animationFillColor!,
-        animationT,
-        animationTapOffset!,
+        anim.targetPath,
+        anim.fillColor,
+        anim.t,
+        anim.tapOffset,
       );
     }
 
@@ -106,6 +94,5 @@ class ColoringPainter extends CustomPainter {
   bool shouldRepaint(ColoringPainter old) =>
       old.filledPaths != filledPaths ||
       old.hintOpacity != hintOpacity ||
-      old.animationT != animationT ||
-      old.activeAnimation != activeAnimation;
+      old.activeAnimations != activeAnimations;
 }

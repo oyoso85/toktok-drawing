@@ -37,6 +37,16 @@ class ToolColors {
       active: Color(0xFFFFB74D),
       glow: Color(0x99FFB74D),
     ),
+    DrawingTool.dryPencil: ToolColorSet(
+      bg: Color(0xFFF0EBE3),
+      active: Color(0xFF8D6E63),
+      glow: Color(0x998D6E63),
+    ),
+    DrawingTool.watercolorPencil: ToolColorSet(
+      bg: Color(0xFFE0F7FA),
+      active: Color(0xFF26C6DA),
+      glow: Color(0x9926C6DA),
+    ),
     DrawingTool.eraser: ToolColorSet(
       bg: Color(0xFFF3E5F5),
       active: Color(0xFFCE93D8),

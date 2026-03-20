@@ -7,7 +7,6 @@ class ColoringState {
   /// index → 실제 채워진 색상 (사용자가 선택한 색)
   final Map<int, Color> filledPaths;
 
-  final bool isAnimating;
   final bool isCompleted;
 
   /// 현재 사용자가 선택한 팔레트 색상
@@ -19,7 +18,6 @@ class ColoringState {
   const ColoringState({
     required this.parsedPaths,
     required this.filledPaths,
-    required this.isAnimating,
     required this.isCompleted,
     this.selectedColor,
     this.svgViewBox = const Size(630, 648),
@@ -28,7 +26,6 @@ class ColoringState {
   factory ColoringState.initial() => const ColoringState(
         parsedPaths: [],
         filledPaths: {},
-        isAnimating: false,
         isCompleted: false,
       );
 
@@ -36,18 +33,24 @@ class ColoringState {
       parsedPaths.where((p) => p.isInteractive).toList();
 
   /// SVG의 interactive path에서 추출한 중복 없는 색상 목록 (팔레트용).
+  /// 빨→주→노→초→파→남→보 무지개 순서 (HSV hue 기준 오름차순).
   List<Color> get paletteColors {
     final seen = <Color>{};
-    return interactivePaths
+    final unique = interactivePaths
         .map((p) => p.fillColor)
         .where(seen.add)
         .toList();
+    unique.sort((a, b) {
+      final ha = HSVColor.fromColor(a).hue;
+      final hb = HSVColor.fromColor(b).hue;
+      return ha.compareTo(hb);
+    });
+    return unique;
   }
 
   ColoringState copyWith({
     List<ColoringPath>? parsedPaths,
     Map<int, Color>? filledPaths,
-    bool? isAnimating,
     bool? isCompleted,
     Color? selectedColor,
     Size? svgViewBox,
@@ -55,7 +58,6 @@ class ColoringState {
     return ColoringState(
       parsedPaths: parsedPaths ?? this.parsedPaths,
       filledPaths: filledPaths ?? this.filledPaths,
-      isAnimating: isAnimating ?? this.isAnimating,
       isCompleted: isCompleted ?? this.isCompleted,
       selectedColor: selectedColor ?? this.selectedColor,
       svgViewBox: svgViewBox ?? this.svgViewBox,

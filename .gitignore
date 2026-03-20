@@ -1,3 +1,10 @@
+# Local / generated
+.claude/
+android/build/
+bash.exe.stackdump
+character.svg
+pen/
+
 # Miscellaneous
 *.bak
 *.class

@@ -1,12 +1,27 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:toktok_drawing/features/coloring/animations/fill_animation_painter.dart';
+import 'package:toktok_drawing/features/coloring/animations/active_fill_animation.dart';
 import 'package:toktok_drawing/features/coloring/animations/fill_animation_selector.dart';
 import 'package:toktok_drawing/features/coloring/models/coloring_path.dart';
 import 'package:toktok_drawing/features/coloring/models/coloring_transform.dart';
 import 'package:toktok_drawing/features/coloring/painters/coloring_painter.dart';
 import 'package:toktok_drawing/features/coloring/providers/coloring_provider.dart';
+
+/// 동시에 진행 중인 채우기 애니메이션 항목.
+class _AnimEntry {
+  final AnimationController controller;
+  final ActiveFillAnimation Function() snapshot;
+  final int pathIndex;
+  final Color fillColor;
+
+  _AnimEntry({
+    required this.controller,
+    required this.snapshot,
+    required this.pathIndex,
+    required this.fillColor,
+  });
+}
 
 class ColoringCanvas extends ConsumerStatefulWidget {
   final ui.FragmentProgram? pencilProgram;
@@ -19,16 +34,11 @@ class ColoringCanvas extends ConsumerStatefulWidget {
 
 class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
     with TickerProviderStateMixin {
-  late AnimationController _animController;
-
   /// 미채움 단면 힌트: 0→10%→0 opacity, 1.5초 왕복 (3초 주기)
   late AnimationController _hintController;
 
-  FillAnimationPainter? _activePainter;
-  ui.Path? _animTargetPath;
-  Color? _animFillColor;
-  Offset? _animTapOffset;
-  int? _animatingPathIndex;
+  final List<_AnimEntry> _activeAnims = [];
+
   ColoringTransform? _transform;
   Size? _lastCanvasSize;
   Size? _lastSvgViewBox;
@@ -36,52 +46,28 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 900))
-      ..addListener(_onAnimationTick)
-      ..addStatusListener(_onAnimationStatus);
-
     _hintController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1500))
-      ..addListener(_onAnimationTick)
+      ..addListener(_onTick)
       ..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _animController.dispose();
     _hintController.dispose();
+    for (final entry in _activeAnims) {
+      entry.controller.dispose();
+    }
+    _activeAnims.clear();
     super.dispose();
   }
 
-  void _onAnimationTick() => setState(() {});
-
-  void _onAnimationStatus(AnimationStatus status) {
-    if (status == AnimationStatus.completed) {
-      // 애니메이션 완료 → path를 filled로 전환
-      if (_animatingPathIndex != null && _animFillColor != null) {
-        ref
-            .read(coloringProvider.notifier)
-            .fillPath(_animatingPathIndex!, _animFillColor!);
-      }
-      ref.read(coloringProvider.notifier).setAnimating(false);
-      setState(() {
-        _activePainter = null;
-        _animTargetPath = null;
-        _animFillColor = null;
-        _animTapOffset = null;
-        _animatingPathIndex = null;
-      });
-    }
-  }
+  void _onTick() => setState(() {});
 
   void _onTap(Offset canvasOffset) {
-    final state = ref.read(coloringProvider);
-
-    // 애니메이션 진행 중 탭 차단
-    if (state.isAnimating) return;
-
     if (_transform == null) return;
+
+    final state = ref.read(coloringProvider);
 
     // SVG 좌표계로 역변환
     final svgOffset = _transform!.toSvgOffset(canvasOffset);
@@ -90,11 +76,15 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
     final selectedColor = state.selectedColor;
     if (selectedColor == null) return;
 
-    // Hit detection: 소형/흰색/이미 채워진 path 제외, 역순(z-order 상위 우선)
+    // 현재 애니메이션 중인 path 인덱스 집합
+    final animatingIndices = _activeAnims.map((e) => e.pathIndex).toSet();
+
+    // Hit detection: 소형/흰색/이미 채워진/이미 애니메이션 중인 path 제외
     ColoringPath? hit;
     for (final cp in state.parsedPaths.reversed) {
       if (!cp.isInteractive) continue;
       if (state.filledPaths.containsKey(cp.index)) continue;
+      if (animatingIndices.contains(cp.index)) continue;
       if (!cp.bounds.contains(svgOffset)) continue;
       if (cp.path.contains(svgOffset)) {
         hit = cp;
@@ -107,7 +97,7 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
     // 선택한 색이 해당 단면의 원본 색과 다르면 채우지 않음
     if (selectedColor != hit.fillColor) return;
 
-    // 효과 선택 및 애니메이션 시작 (선택한 색상 사용)
+    // 효과 선택
     final painter = FillAnimationSelector.select(
       bounds: hit.bounds,
       fillColor: selectedColor,
@@ -115,20 +105,49 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
       pencilProgram: widget.pencilProgram,
     );
 
-    _animController.duration = painter.duration;
-    _animController.reset();
+    final controller = AnimationController(
+      vsync: this,
+      duration: painter.duration,
+    );
 
-    ref.read(coloringProvider.notifier).setAnimating(true);
+    final capturedPath = hit.path;
+    final capturedColor = selectedColor;
+    final capturedTapOffset = svgOffset;
+    final capturedIndex = hit.index;
 
-    setState(() {
-      _activePainter = painter;
-      _animTargetPath = hit!.path;
-      _animFillColor = selectedColor;
-      _animTapOffset = svgOffset;
-      _animatingPathIndex = hit.index;
+    late _AnimEntry entry;
+
+    entry = _AnimEntry(
+      controller: controller,
+      snapshot: () => ActiveFillAnimation(
+        painter: painter,
+        targetPath: capturedPath,
+        fillColor: capturedColor,
+        tapOffset: capturedTapOffset,
+        t: controller.value,
+      ),
+      pathIndex: capturedIndex,
+      fillColor: capturedColor,
+    );
+
+    controller.addListener(_onTick);
+    controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        ref
+            .read(coloringProvider.notifier)
+            .fillPath(entry.pathIndex, entry.fillColor);
+        setState(() {
+          _activeAnims.remove(entry);
+        });
+        controller.dispose();
+      }
     });
 
-    _animController.forward();
+    setState(() {
+      _activeAnims.add(entry);
+    });
+
+    controller.forward();
   }
 
   @override
@@ -149,6 +168,8 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
           );
         }
 
+        final activeAnimations = _activeAnims.map((e) => e.snapshot()).toList();
+
         return GestureDetector(
           onTapDown: (d) => _onTap(d.localPosition),
           child: RepaintBoundary(
@@ -157,11 +178,7 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
                 paths: state.parsedPaths,
                 filledPaths: state.filledPaths,
                 hintOpacity: _hintController.value * 0.25,
-                activeAnimation: _activePainter,
-                animationTargetPath: _animTargetPath,
-                animationFillColor: _animFillColor,
-                animationTapOffset: _animTapOffset,
-                animationT: _animController.value,
+                activeAnimations: activeAnimations,
                 transformMatrix: _transform?.storage,
               ),
               child: const SizedBox.expand(),

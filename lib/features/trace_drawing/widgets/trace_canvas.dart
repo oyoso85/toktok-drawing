@@ -169,7 +169,11 @@ class _TraceCanvasState extends State<TraceCanvas> {
           Paint()..color = startColor..style = PaintingStyle.fill);
     }
 
-    renderer.drawRainbowSegmentRange(c, stroke, _checkpointSegCount, upToSeg);
+    if (stroke.tool == DrawingTool.pen || stroke.tool == DrawingTool.pencil) {
+      renderer.drawRainbowPenSegmentRange(c, stroke, _checkpointSegCount, upToSeg);
+    } else {
+      renderer.drawRainbowSegmentRange(c, stroke, _checkpointSegCount, upToSeg);
+    }
 
     final picture = recorder.endRecording();
     final oldImage = _rainbowImage;
@@ -378,7 +382,11 @@ class _TracePainter extends CustomPainter with StrokePainterMixin {
   void _drawPendingSegments(Canvas canvas, RainbowStroke stroke) {
     final totalSeg = stroke.points.length - 1;
     if (totalSeg <= checkpointSegCount) return;
-    drawRainbowSegmentRange(canvas, stroke, checkpointSegCount, totalSeg);
+    if (stroke.tool == DrawingTool.pen || stroke.tool == DrawingTool.pencil) {
+      drawRainbowPenSegmentRange(canvas, stroke, checkpointSegCount, totalSeg);
+    } else {
+      drawRainbowSegmentRange(canvas, stroke, checkpointSegCount, totalSeg);
+    }
   }
 
   void _drawHitZone(Canvas canvas) {
