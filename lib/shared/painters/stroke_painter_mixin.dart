@@ -205,7 +205,7 @@ mixin StrokePainterMixin {
 
     if (points.length == 1) {
       canvas.drawCircle(points[0], stroke.size * 0.65, Paint()
-        ..color = stroke.color.withValues(alpha: 0.28)
+        ..color = stroke.color.withValues(alpha: 0.36)
         ..style = PaintingStyle.fill
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, stroke.size * 0.55));
       return;
@@ -240,7 +240,7 @@ mixin StrokePainterMixin {
         ..shader = shader);
     } else {
       canvas.drawPath(path, Paint()
-        ..color = stroke.color.withValues(alpha: 0.32)
+        ..color = stroke.color.withValues(alpha: 0.42)
         ..style = PaintingStyle.fill);
     }
 

@@ -82,11 +82,11 @@ void main() {
     float n = fbm(uv * scale);
 
     // 낮고 부드러운 베이스 opacity
-    opacity = 0.18 + n * 0.36;
+    opacity = 0.23 + n * 0.47;
 
     // 미세 텍스쳐 (고주파 약한 오버레이) — 물감 표면의 입자감
-    float fine = fbm(uv * scale * 4.5) * 0.10;
-    opacity = clamp(opacity + fine, 0.0, 0.60);
+    float fine = fbm(uv * scale * 4.5) * 0.13;
+    opacity = clamp(opacity + fine, 0.0, 0.78);
 
   } else {
     // ── 기본 색연필 (Pencil) ─────────────────────────────────────────────────

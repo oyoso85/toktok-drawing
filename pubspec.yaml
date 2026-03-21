@@ -3,6 +3,23 @@ description: "TokTok Drawing - 3~7세 유아/어린이용 그림그리기 앱"
 publish_to: 'none'
 version: 1.0.0+1
 
+# 멀티 앱 확장 준비 — 로컬 패키지 구조
+# 현재 코드는 이 앱 안에 있지만, 마이그레이션 시 아래 패키지를 path:로 참조:
+#
+# dependencies:
+#   drawing_engine:
+#     path: packages/drawing_engine
+#   asset_manager:
+#     path: packages/asset_manager
+#   storage:
+#     path: packages/storage
+#   user_progress:
+#     path: packages/user_progress
+#   purchase:
+#     path: packages/purchase
+#   ui_kit:
+#     path: packages/ui_kit
+
 environment:
   sdk: ^3.10.8
 

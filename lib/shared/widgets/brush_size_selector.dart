@@ -5,7 +5,10 @@ class BrushSizeSelector extends StatelessWidget {
   final double selectedSize;
   final ValueChanged<double> onSizeSelected;
 
-  static const List<double> sizes = [16.0, 28.0, 44.0, 64.0];
+  static const List<double> sizes = [8.0, 20.0, 42.0, 80.0];
+
+  // 버튼 내 원 표시 크기 (실제 획 크기와 별개로 시각적 구분용)
+  static const List<double> _dotSizes = [8.0, 16.0, 26.0, 38.0];
 
   // 크기별 고유 컬러 (작→큰: 파랑→주황→핑크→보라)
   static const List<Color> _dotColors = [
@@ -29,7 +32,7 @@ class BrushSizeSelector extends StatelessWidget {
         final size = sizes[index];
         final isSelected = size == selectedSize;
         final dotColor = _dotColors[index];
-        final dotSize = size.clamp(10.0, 32.0);
+        final dotSize = _dotSizes[index];
 
         return AnimatedPressable(
           onTap: () => onSizeSelected(size),
