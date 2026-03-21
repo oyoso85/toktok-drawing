@@ -81,6 +81,8 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
 
     // Hit detection: 소형/흰색/이미 채워진/이미 애니메이션 중인 path 제외
     ColoringPath? hit;
+
+    // 1단계: 정확한 탭
     for (final cp in state.parsedPaths.reversed) {
       if (!cp.isInteractive) continue;
       if (state.filledPaths.containsKey(cp.index)) continue;
@@ -90,6 +92,35 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
         hit = cp;
         break;
       }
+    }
+
+    // 2단계: tolerance 범위 내 가장 작은 path (정확히 탭 못했을 때)
+    if (hit == null) {
+      const toleranceCanvasPx = 36.0;
+      final tol = _transform!.toSvgDistance(toleranceCanvasPx);
+      final toleranceCircle = ui.Path()
+        ..addOval(Rect.fromCircle(center: svgOffset, radius: tol));
+
+      ColoringPath? nearest;
+      double nearestArea = double.infinity;
+
+      for (final cp in state.parsedPaths) {
+        if (!cp.isInteractive) continue;
+        if (state.filledPaths.containsKey(cp.index)) continue;
+        if (animatingIndices.contains(cp.index)) continue;
+        if (!cp.bounds.inflate(tol).contains(svgOffset)) continue;
+
+        final intersection = ui.Path.combine(
+          ui.PathOperation.intersect, cp.path, toleranceCircle);
+        if (intersection.getBounds().isEmpty) continue;
+
+        final area = cp.bounds.width * cp.bounds.height;
+        if (area < nearestArea) {
+          nearestArea = area;
+          nearest = cp;
+        }
+      }
+      hit = nearest;
     }
 
     if (hit == null) return;

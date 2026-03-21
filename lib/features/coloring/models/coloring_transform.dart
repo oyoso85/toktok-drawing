@@ -43,4 +43,11 @@ class ColoringTransform {
     );
     return Offset(v.x, v.y);
   }
+
+  /// 캔버스 픽셀 단위 거리를 SVG 좌표계 거리로 변환 (tolerance 계산용).
+  double toSvgDistance(double canvasPx) {
+    // uniform scale이므로 x축 스케일의 역수를 사용
+    final scale = matrix.getColumn(0).length;
+    return canvasPx / scale;
+  }
 }

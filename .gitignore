@@ -2,7 +2,6 @@
 .claude/
 android/build/
 bash.exe.stackdump
-character.svg
 pen/
 
 # packages 빌드 결과물

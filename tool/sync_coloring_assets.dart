@@ -1,16 +1,15 @@
 /// 색칠하기 SVG 에셋 동기화 스크립트
 ///
-/// assets/templates/coloring/ 하위 폴더를 스캔하여
+/// assets/templates/coloring/ 하위 SVG 파일을 스캔하여
 /// pubspec.yaml과 svg_template_registry.dart를 자동으로 업데이트한다.
 ///
 /// 사용법:
 ///   dart run tool/sync_coloring_assets.dart
 ///
 /// SVG 추가 방법:
-///   1. assets/templates/coloring/{폴더명}/ 생성
-///   2. SVG 파일 넣기 (파일명은 폴더명과 동일하게: {폴더명}.svg)
-///   3. (선택) name.txt 파일에 화면에 표시할 이름 작성 (없으면 폴더명 사용)
-///   4. dart run tool/sync_coloring_assets.dart 실행
+///   1. assets/templates/coloring/{id}.svg 파일 추가
+///   2. (선택) assets/templates/coloring/{id}-name.txt 에 표시할 이름 작성 (없으면 id 사용)
+///   3. dart run tool/sync_coloring_assets.dart 실행
 
 import 'dart:io';
 
@@ -19,11 +18,11 @@ const _pubspecPath = 'pubspec.yaml';
 const _registryPath = 'lib/features/coloring/data/svg_template_registry.dart';
 
 void main() {
-  // 1. 폴더 스캔
+  // 1. SVG 파일 스캔
   final templates = _scanTemplates();
 
   if (templates.isEmpty) {
-    print('템플릿 없음: $_coloringAssetsDir 하위에 SVG 폴더가 없습니다.');
+    print('템플릿 없음: $_coloringAssetsDir 하위에 SVG 파일이 없습니다.');
     return;
   }
 
@@ -59,48 +58,30 @@ List<_Template> _scanTemplates() {
 
   final templates = <_Template>[];
 
-  final subDirs = dir.listSync().whereType<Directory>().toList()
+  // 직속 SVG 파일만 스캔 (-name.txt와 쌍을 이루지 않아도 됨)
+  final svgFiles = dir
+      .listSync()
+      .whereType<File>()
+      .where((f) => f.path.endsWith('.svg') && !f.path.endsWith('.bak'))
+      .toList()
     ..sort((a, b) => a.path.compareTo(b.path));
 
-  for (final subDir in subDirs) {
-    final id = subDir.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
+  for (final svgFile in svgFiles) {
+    final fileName = svgFile.uri.pathSegments.last; // e.g. character.svg
+    final id = fileName.substring(0, fileName.length - 4); // remove .svg
 
-    // {폴더명}.svg 파일 탐색
-    final svgFile = File('${subDir.path}/$id.svg');
-    if (!svgFile.existsSync()) {
-      // 폴더 내 첫 번째 SVG로 폴백
-      final anySvg = subDir
-          .listSync()
-          .whereType<File>()
-          .where((f) => f.path.endsWith('.svg'))
-          .toList();
-      if (anySvg.isEmpty) continue;  // SVG 없는 폴더 무시
-    }
+    // {id}-name.txt 에서 표시 이름 읽기 (없으면 id 사용)
+    final nameFile = File('$_coloringAssetsDir/$id-name.txt');
+    final name = nameFile.existsSync() ? nameFile.readAsStringSync().trim() : id;
 
-    // name.txt에서 표시 이름 읽기 (없으면 폴더명 사용)
-    final nameFile = File('${subDir.path}/name.txt');
-    final name = nameFile.existsSync()
-        ? nameFile.readAsStringSync().trim()
-        : id;
-
-    final svgPath = svgFile.existsSync()
-        ? '$_coloringAssetsDir/$id/$id.svg'
-        : _firstSvgPath(subDir);
-
-    templates.add(_Template(id: id, name: name, assetPath: svgPath));
+    templates.add(_Template(
+      id: id,
+      name: name,
+      assetPath: '$_coloringAssetsDir/$fileName',
+    ));
   }
 
   return templates;
-}
-
-String _firstSvgPath(Directory dir) {
-  final file = dir
-      .listSync()
-      .whereType<File>()
-      .firstWhere((f) => f.path.endsWith('.svg'));
-  final fileName = file.uri.pathSegments.last;
-  final id = dir.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
-  return '$_coloringAssetsDir/$id/$fileName';
 }
 
 // ── pubspec.yaml 업데이트 ────────────────────────────────────────────────────
@@ -109,37 +90,30 @@ void _updatePubspec(List<_Template> templates) {
   final file = File(_pubspecPath);
   final lines = file.readAsLinesSync();
 
-  // 새로 추가할 경로 목록
-  final newFolders = templates
-      .map((t) => '    - ${t.assetPath.substring(0, t.assetPath.lastIndexOf('/') + 1)}')
-      .toSet();
+  // coloring 폴더 전체를 단일 항목으로 등록
+  const newEntry = '    - $_coloringAssetsDir/';
 
-  // assets: 블록에서 coloring 폴더 항목만 교체
-  final result = <String>[];
-  var inAssets = false;
+  // assets: 블록에서 coloring 항목만 교체
   var coloringStart = -1;
   var coloringEnd = -1;
 
   for (var i = 0; i < lines.length; i++) {
-    final line = lines[i];
-    if (line.trimLeft().startsWith('assets:')) inAssets = true;
-    if (inAssets && line.contains('coloring/')) {
+    if (lines[i].contains('coloring/')) {
       if (coloringStart == -1) coloringStart = i;
       coloringEnd = i;
     }
   }
 
   if (coloringStart == -1) {
-    // coloring 항목이 아예 없으면 assets: 블록 끝에 추가
     stderr.writeln('경고: pubspec.yaml에 coloring 항목이 없습니다. 수동으로 추가하세요.');
     return;
   }
 
-  // coloringStart~coloringEnd 범위를 새 목록으로 교체
+  final result = <String>[];
   var replaced = false;
   for (var i = 0; i < lines.length; i++) {
     if (i == coloringStart && !replaced) {
-      result.addAll(newFolders);
+      result.add(newEntry);
       replaced = true;
     }
     if (i >= coloringStart && i <= coloringEnd) continue;

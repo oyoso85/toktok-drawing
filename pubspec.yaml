@@ -50,9 +50,7 @@ flutter:
     - assets/images/
     - assets/main/
     - assets/templates/trace/
-    - assets/templates/coloring/A_charming_vector_illustration_cat_character_desig/
-    - assets/templates/coloring/A_charming_vector_illustration_dinosaur_character/
-    - assets/templates/coloring/character/
+    - assets/templates/coloring/
     - assets/brushes/
 
   shaders:

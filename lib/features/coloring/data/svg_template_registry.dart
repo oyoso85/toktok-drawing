@@ -7,16 +7,16 @@ const List<SvgTemplate> kSvgTemplates = [
   SvgTemplate(
     id: 'A_charming_vector_illustration_cat_character_desig',
     name: '고양이',
-    assetPath: 'assets/templates/coloring/A_charming_vector_illustration_cat_character_desig/A_charming_vector_illustration_cat_character_desig.svg',
+    assetPath: 'assets/templates/coloring/A_charming_vector_illustration_cat_character_desig.svg',
   ),
   SvgTemplate(
     id: 'A_charming_vector_illustration_dinosaur_character',
     name: '공룡',
-    assetPath: 'assets/templates/coloring/A_charming_vector_illustration_dinosaur_character/A_charming_vector_illustration_dinosaur_character.svg',
+    assetPath: 'assets/templates/coloring/A_charming_vector_illustration_dinosaur_character.svg',
   ),
   SvgTemplate(
     id: 'character',
     name: '캐릭터',
-    assetPath: 'assets/templates/coloring/character/character.svg',
+    assetPath: 'assets/templates/coloring/character.svg',
   ),
 ];

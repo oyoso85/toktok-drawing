@@ -106,7 +106,7 @@ lib/
 │   └── widgets/             # AnimatedPressable, ColorPalette, DrawingToolbar 등
 assets/
 ├── shaders/pencil.frag      # 색연필 Fragment Shader
-└── templates/coloring/      # SVG 색칠 템플릿 (폴더 단위 관리)
+└── templates/coloring/      # SVG 색칠 템플릿 (flat 파일 관리)
 tool/
 ├── normalize_svg.dart       # SVG 정규화 스크립트
 └── sync_coloring_assets.dart # 템플릿 등록 자동화 스크립트
@@ -194,7 +194,7 @@ class FooNotifier extends Notifier<FooState> {
 Illustrator 설정이 올바르지 않거나, `style=` 형식으로 저장된 경우 실행:
 
 ```bash
-dart run tool/normalize_svg.dart assets/templates/coloring/character/character.svg
+dart run tool/normalize_svg.dart assets/templates/coloring/character.svg
 ```
 
 - 원본을 `.bak`으로 백업 후 정규화된 버전으로 덮어씀
@@ -204,10 +204,9 @@ dart run tool/normalize_svg.dart assets/templates/coloring/character/character.s
 ### 3. 새 SVG 템플릿 추가
 
 ```bash
-# 1) 폴더 + 파일 생성
-mkdir assets/templates/coloring/{폴더명}/
-cp 새파일.svg assets/templates/coloring/{폴더명}/{폴더명}.svg
-echo "한글 이름" > assets/templates/coloring/{폴더명}/name.txt
+# 1) SVG + 이름 파일 추가
+cp 새파일.svg assets/templates/coloring/{id}.svg
+echo "한글 이름" > assets/templates/coloring/{id}-name.txt
 
 # 2) 레지스트리 + pubspec.yaml 자동 갱신
 dart run tool/sync_coloring_assets.dart
