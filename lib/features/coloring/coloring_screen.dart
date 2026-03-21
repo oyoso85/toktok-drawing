@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toktok_drawing/core/constants/app_colors.dart';
 import 'package:toktok_drawing/features/coloring/models/svg_template.dart';
 import 'package:toktok_drawing/features/coloring/providers/coloring_provider.dart';
+import 'package:toktok_drawing/features/coloring/services/coloring_progress_service.dart';
 import 'package:toktok_drawing/features/coloring/widgets/coloring_canvas.dart';
 import 'package:toktok_drawing/features/coloring/widgets/completion_overlay.dart';
 
@@ -214,6 +215,10 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
           _showEarlyNextButton = false;
           _showAutoCompleteButton = false;
         });
+        // 완성 상태 저장
+        final filledPaths = ref.read(coloringProvider).filledPaths;
+        ColoringProgressService.instance
+            .saveCompleted(widget.svgAssetPath, filledPaths);
       }
     });
 

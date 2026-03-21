@@ -8,6 +8,7 @@ import 'package:toktok_drawing/features/coloring/models/coloring_transform.dart'
 import 'package:toktok_drawing/features/coloring/models/svg_coloring_parser.dart';
 import 'package:toktok_drawing/features/coloring/models/svg_template.dart';
 import 'package:toktok_drawing/features/coloring/painters/coloring_thumbnail_painter.dart';
+import 'package:toktok_drawing/features/coloring/services/coloring_progress_service.dart';
 
 class ColoringSelectScreen extends StatelessWidget {
   const ColoringSelectScreen({super.key});
@@ -161,6 +162,7 @@ class _SvgThumbnail extends StatefulWidget {
 class _SvgThumbnailState extends State<_SvgThumbnail> {
   List<ColoringPath>? _paths;
   Size _svgViewBox = const Size(630, 648);
+  Map<int, Color>? _filledPaths;
 
   @override
   void initState() {
@@ -172,10 +174,13 @@ class _SvgThumbnailState extends State<_SvgThumbnail> {
     final svgString = await rootBundle.loadString(widget.assetPath);
     final paths = SvgColoringParser.parse(svgString);
     final viewBox = SvgColoringParser.parseViewBox(svgString);
+    final filledPaths =
+        await ColoringProgressService.instance.loadCompleted(widget.assetPath);
     if (mounted) {
       setState(() {
         _paths = paths;
         _svgViewBox = viewBox;
+        _filledPaths = filledPaths;
       });
     }
   }
@@ -195,6 +200,7 @@ class _SvgThumbnailState extends State<_SvgThumbnail> {
           painter: ColoringThumbnailPainter(
             paths: _paths!,
             transformMatrix: transform.storage,
+            filledPaths: _filledPaths,
           ),
           size: Size(constraints.maxWidth, constraints.maxHeight),
         );

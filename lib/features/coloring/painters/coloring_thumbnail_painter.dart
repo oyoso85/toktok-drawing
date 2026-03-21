@@ -3,15 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:toktok_drawing/features/coloring/models/coloring_path.dart';
 
 /// 색칠하기 선택 화면의 썸네일용 CustomPainter.
-/// 모든 interactive path를 흰색 fill + 검정 stroke으로 렌더링.
-/// non-interactive path(배경·장식)는 SVG 원본 색상으로 표시.
+/// [filledPaths]가 있으면 완성된 컬러로 렌더링, 없으면 흰색 + 검정 테두리(미완성).
+/// non-interactive path(배경·장식)는 항상 SVG 원본 색상으로 표시.
 class ColoringThumbnailPainter extends CustomPainter {
   final List<ColoringPath> paths;
   final Float64List? transformMatrix;
 
+  /// 완성된 색칠 상태. null이면 미완성(흰색+테두리).
+  final Map<int, Color>? filledPaths;
+
   const ColoringThumbnailPainter({
     required this.paths,
     this.transformMatrix,
+    this.filledPaths,
   });
 
   @override
@@ -32,7 +36,6 @@ class ColoringThumbnailPainter extends CustomPainter {
 
     for (final cp in paths) {
       if (!cp.isInteractive) {
-        // 흰색·검정 면(및 tiny): 원본 색으로 채워진 상태로 표시
         canvas.drawPath(
           cp.path,
           Paint()
@@ -41,8 +44,21 @@ class ColoringThumbnailPainter extends CustomPainter {
         );
         continue;
       }
-      canvas.drawPath(cp.path, whitePaint);
-      canvas.drawPath(cp.path, strokePaint);
+
+      final savedColor = filledPaths?[cp.index];
+      if (savedColor != null) {
+        // 완성된 도안: 저장된 색으로 채움
+        canvas.drawPath(
+          cp.path,
+          Paint()
+            ..color = savedColor
+            ..style = PaintingStyle.fill,
+        );
+      } else {
+        // 미완성: 흰색 + 테두리
+        canvas.drawPath(cp.path, whitePaint);
+        canvas.drawPath(cp.path, strokePaint);
+      }
     }
 
     if (transformMatrix != null) {
@@ -51,5 +67,6 @@ class ColoringThumbnailPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(ColoringThumbnailPainter old) => old.paths != paths;
+  bool shouldRepaint(ColoringThumbnailPainter old) =>
+      old.paths != paths || old.filledPaths != filledPaths;
 }
