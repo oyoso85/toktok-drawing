@@ -171,17 +171,21 @@ class _SvgThumbnailState extends State<_SvgThumbnail> {
   }
 
   Future<void> _loadPaths() async {
-    final svgString = await rootBundle.loadString(widget.assetPath);
-    final paths = SvgColoringParser.parse(svgString);
-    final viewBox = SvgColoringParser.parseViewBox(svgString);
-    final filledPaths =
-        await ColoringProgressService.instance.loadCompleted(widget.assetPath);
-    if (mounted) {
-      setState(() {
-        _paths = paths;
-        _svgViewBox = viewBox;
-        _filledPaths = filledPaths;
-      });
+    try {
+      final svgString = await rootBundle.loadString(widget.assetPath);
+      final paths = SvgColoringParser.parse(svgString);
+      final viewBox = SvgColoringParser.parseViewBox(svgString);
+      final filledPaths =
+          await ColoringProgressService.instance.loadCompleted(widget.assetPath);
+      if (mounted) {
+        setState(() {
+          _paths = paths;
+          _svgViewBox = viewBox;
+          _filledPaths = filledPaths;
+        });
+      }
+    } catch (e) {
+      debugPrint('[Thumbnail] SVG 로드 실패 ${widget.assetPath}: $e');
     }
   }
 

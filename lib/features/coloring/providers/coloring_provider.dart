@@ -32,7 +32,15 @@ class ColoringNotifier extends Notifier<ColoringState> {
 
   /// 특정 path를 채워진 상태로 전환하고 완성 여부를 체크.
   void fillPath(int index, Color color) {
-    final updated = {...state.filledPaths, index: color};
+    fillPaths([index], color);
+  }
+
+  /// 여러 path를 한 번에 채워진 상태로 전환하고 완성 여부를 체크.
+  void fillPaths(List<int> indices, Color color) {
+    final updated = {...state.filledPaths};
+    for (final i in indices) {
+      updated[i] = color;
+    }
     final isCompleted =
         state.interactivePaths.every((p) => updated.containsKey(p.index));
 

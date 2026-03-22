@@ -18,6 +18,10 @@ class ColoringPath {
   /// fill 색상이 검정 계열인 path. 처음부터 검정으로 채워져 표시되며 탭 대상에서 제외.
   final bool isBlack;
 
+  /// 소속된 SVG <g> 그룹의 식별자. null이면 그룹 없음.
+  /// 같은 groupId를 가진 path들은 탭 시 함께 채워진다.
+  final String? groupId;
+
   const ColoringPath({
     required this.index,
     required this.path,
@@ -26,6 +30,7 @@ class ColoringPath {
     required this.isTiny,
     required this.isWhite,
     this.isBlack = false,
+    this.groupId,
   });
 
   /// 사용자가 탭하여 채색할 수 있는 인터랙티브 단면인지 여부.

@@ -26,27 +26,32 @@ class ColoringProgressService {
   }
 
   /// 완성된 색칠 상태 저장. [filledPaths]: index → color 정수값
+  /// 저장 실패(웹 등 미지원 플랫폼 포함) 시 조용히 무시.
   Future<void> saveCompleted(
     String assetPath,
     Map<int, Color> filledPaths,
   ) async {
-    final dir = await _dir;
-    final file = File(p.join(dir.path, _fileName(assetPath)));
-    final data = {
-      'isCompleted': true,
-      'filledPaths': filledPaths
-          .map((k, v) => MapEntry(k.toString(), v.toARGB32())),
-    };
-    await file.writeAsString(jsonEncode(data));
+    try {
+      final dir = await _dir;
+      final file = File(p.join(dir.path, _fileName(assetPath)));
+      final data = {
+        'isCompleted': true,
+        'filledPaths': filledPaths
+            .map((k, v) => MapEntry(k.toString(), v.toARGB32())),
+      };
+      await file.writeAsString(jsonEncode(data));
+    } catch (_) {
+      // 웹 등 미지원 플랫폼에서는 무시
+    }
   }
 
   /// 저장된 색칠 상태 로드. 없거나 미완성이면 null 반환.
+  /// 로드 실패(웹 등 미지원 플랫폼 포함) 시 null 반환.
   Future<Map<int, Color>?> loadCompleted(String assetPath) async {
-    final dir = await _dir;
-    final file = File(p.join(dir.path, _fileName(assetPath)));
-    if (!await file.exists()) return null;
-
     try {
+      final dir = await _dir;
+      final file = File(p.join(dir.path, _fileName(assetPath)));
+      if (!await file.exists()) return null;
       final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       if (data['isCompleted'] != true) return null;
       final raw = data['filledPaths'] as Map<String, dynamic>;

@@ -50,6 +50,10 @@ class SvgColoringParser {
     final result = <ColoringPath>[];
     final seenDStrings = <String>{};  // Illustrator 중복 path 제거용
 
+    // <g> 요소 → 그룹 ID 맵 (파싱 중 생성)
+    final gElementIds = <XmlElement, String>{};
+    int gCounter = 0;
+
     int index = 0;
     for (final element in pathElements) {
       final d = element.getAttribute('d');
@@ -77,6 +81,12 @@ class SvgColoringParser {
       final isWhite = color != null && _isNearWhite(color);
       final isBlack = color != null && _isNearBlack(color);
 
+      // 가장 가까운 부모 <g> 찾기
+      final groupId = _resolveGroupId(element, gElementIds, () {
+        gCounter++;
+        return 'g$gCounter';
+      });
+
       result.add(ColoringPath(
         index: index,
         path: effectivePath,
@@ -85,6 +95,7 @@ class SvgColoringParser {
         isTiny: isTiny,
         isWhite: isWhite,
         isBlack: isBlack,
+        groupId: groupId,
       ));
       index++;
     }
@@ -193,6 +204,26 @@ class SvgColoringParser {
       return Color.fromARGB(255, r.clamp(0, 255), g.clamp(0, 255), b.clamp(0, 255));
     }
 
+    return null;
+  }
+
+  /// 가장 가까운 부모 <g> 요소의 그룹 ID를 반환.
+  /// <g>에 id 속성이 있으면 그것을 사용, 없으면 [generateId]로 생성.
+  /// 부모 <g>가 없으면 null 반환.
+  static String? _resolveGroupId(
+    XmlElement element,
+    Map<XmlElement, String> cache,
+    String Function() generateId,
+  ) {
+    XmlNode? node = element.parent;
+    while (node != null) {
+      if (node is XmlElement && node.localName == 'g') {
+        return cache.putIfAbsent(node, () {
+          return node!.getAttribute('id') ?? generateId();
+        });
+      }
+      node = node.parent;
+    }
     return null;
   }
 
