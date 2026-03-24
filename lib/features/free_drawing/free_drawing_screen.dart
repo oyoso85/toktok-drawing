@@ -2,7 +2,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toktok_drawing/shared/models/sparkle_element.dart';
+import 'package:toktok_drawing/shared/services/tutorial_service.dart';
 import 'package:toktok_drawing/shared/widgets/sparkle_object_widget.dart';
+import 'package:toktok_drawing/shared/widgets/tutorial_overlay.dart';
 import 'providers/free_drawing_provider.dart';
 import 'providers/free_drawing_state.dart';
 import 'widgets/drawing_canvas.dart';
@@ -21,6 +23,8 @@ class _FreeDrawingScreenState extends ConsumerState<FreeDrawingScreen> {
 
   // 색연필 Fragment Shader (비동기 로드)
   ui.FragmentProgram? _pencilProgram;
+
+  bool _showTutorial = false;
 
   @override
   void initState() {
@@ -41,6 +45,14 @@ class _FreeDrawingScreenState extends ConsumerState<FreeDrawingScreen> {
       // shader 로드 실패 시 fallback(그레인 파티클)으로 자동 전환
       debugPrint('pencil shader load FAILED: $e');
     }
+    final isFirst =
+        await TutorialService.isFirstTime(TutorialMode.freeDrawing);
+    if (isFirst && mounted) setState(() => _showTutorial = true);
+  }
+
+  void _dismissTutorial() {
+    TutorialService.markSeen(TutorialMode.freeDrawing);
+    setState(() => _showTutorial = false);
   }
 
   void _confirmClearAll(FreeDrawingNotifier notifier) {
@@ -157,6 +169,11 @@ class _FreeDrawingScreenState extends ConsumerState<FreeDrawingScreen> {
                           }
                         },
                       )),
+                  if (_showTutorial)
+                    TutorialOverlay(
+                      gesture: TutorialGesture.drawStroke,
+                      onDismiss: _dismissTutorial,
+                    ),
                 ],
               ),
             ),

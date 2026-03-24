@@ -2,6 +2,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toktok_drawing/features/coloring/widgets/completion_overlay.dart';
+import 'package:toktok_drawing/shared/services/tutorial_service.dart';
+import 'package:toktok_drawing/shared/widgets/tutorial_overlay.dart';
 import 'package:toktok_drawing/features/trace_drawing/data/trace_template_registry.dart';
 import 'package:toktok_drawing/features/trace_drawing/models/trace_template.dart';
 import 'package:toktok_drawing/features/trace_drawing/providers/trace_drawing_provider.dart';
@@ -36,6 +38,7 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen>
 
   int _strokeCount = 0;
   bool _showEarlyNextButton = false;
+  bool _showTutorial = false;
 
   Size? _lastInitializedSize;
   int _lastInitializedIndex = -1;
@@ -99,6 +102,18 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen>
       _lastInitializedSize = null;
       _lastInitializedIndex = -1;
     });
+    _checkTutorial();
+  }
+
+  Future<void> _checkTutorial() async {
+    final isFirst =
+        await TutorialService.isFirstTime(TutorialMode.traceDrawing);
+    if (isFirst && mounted) setState(() => _showTutorial = true);
+  }
+
+  void _dismissTutorial() {
+    TutorialService.markSeen(TutorialMode.traceDrawing);
+    setState(() => _showTutorial = false);
   }
 
   void _onCanvasSizeChanged(Size size) {
@@ -260,6 +275,11 @@ class _TraceDrawingScreenState extends ConsumerState<TraceDrawingScreen>
                       child: _EarlyNextButton(onTap: _goNextTemplate),
                     ),
                   ),
+                  if (_showTutorial && !_showingList)
+                    TutorialOverlay(
+                      gesture: TutorialGesture.tracePath,
+                      onDismiss: _dismissTutorial,
+                    ),
                   if (_showCompletionOverlay)
                     CompletionOverlay(
                       onDone: () {

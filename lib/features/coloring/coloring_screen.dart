@@ -8,6 +8,8 @@ import 'package:toktok_drawing/features/coloring/providers/coloring_provider.dar
 import 'package:toktok_drawing/features/coloring/services/coloring_progress_service.dart';
 import 'package:toktok_drawing/features/coloring/widgets/coloring_canvas.dart';
 import 'package:toktok_drawing/features/coloring/widgets/completion_overlay.dart';
+import 'package:toktok_drawing/shared/services/tutorial_service.dart';
+import 'package:toktok_drawing/shared/widgets/tutorial_overlay.dart';
 
 // ── 컬러 팔레트 패널 ───────────────────────────────────────────────────────────
 
@@ -104,6 +106,7 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
   bool _showingPopup = false;
   bool _showEarlyNextButton = false;
   bool _showAutoCompleteButton = false;
+  bool _showTutorial = false;
 
   // ── 디버그: 단면 순서 자동 채우기 ──────────────────────────────────────────
   Timer? _debugTimer;
@@ -129,6 +132,13 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
     if (mounted) {
       setState(() => _loading = false);
     }
+    final isFirst = await TutorialService.isFirstTime(TutorialMode.coloring);
+    if (isFirst && mounted) setState(() => _showTutorial = true);
+  }
+
+  void _dismissTutorial() {
+    TutorialService.markSeen(TutorialMode.coloring);
+    setState(() => _showTutorial = false);
   }
 
   void _startDebugAutoFill() {
@@ -309,6 +319,11 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
                     child: _AutoCompleteButton(onTap: _autoComplete),
                   ),
                 ),
+                if (_showTutorial)
+                  TutorialOverlay(
+                    gesture: TutorialGesture.tapToFill,
+                    onDismiss: _dismissTutorial,
+                  ),
                 if (_showingCompletion)
                   CompletionOverlay(onDone: _onCompletionDone),
                 if (_showingPopup)
