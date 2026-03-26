@@ -127,7 +127,11 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
       // fallback: pencil 셰이더 없이 일반 Paint 사용
     }
 
-    await ref.read(coloringProvider.notifier).initPaths(widget.svgAssetPath);
+    try {
+      await ref.read(coloringProvider.notifier).initPaths(widget.svgAssetPath);
+    } catch (e) {
+      debugPrint('[ColoringScreen] SVG 로드 실패: $e');
+    }
 
     if (mounted) {
       setState(() => _loading = false);

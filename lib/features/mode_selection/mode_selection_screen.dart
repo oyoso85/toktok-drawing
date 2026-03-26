@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:toktok_drawing/core/constants/app_colors.dart';
@@ -12,8 +13,27 @@ import 'package:toktok_drawing/shared/models/drawing_mode.dart';
 
 const _kPrimary = AppColors.primary;
 
-class ModeSelectionScreen extends StatelessWidget {
+const _kBackgrounds = [
+  'assets/main/bg-farm.svg',
+  'assets/main/bg-city.svg',
+  'assets/main/bg-field.svg',
+];
+
+class ModeSelectionScreen extends StatefulWidget {
   const ModeSelectionScreen({super.key});
+
+  @override
+  State<ModeSelectionScreen> createState() => _ModeSelectionScreenState();
+}
+
+class _ModeSelectionScreenState extends State<ModeSelectionScreen> {
+  late final String _bg;
+
+  @override
+  void initState() {
+    super.initState();
+    _bg = _kBackgrounds[Random().nextInt(_kBackgrounds.length)];
+  }
 
   void _go(BuildContext context, ModeInfo info) {
     Navigator.of(context).push(MaterialPageRoute(
@@ -37,7 +57,7 @@ class ModeSelectionScreen extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          SvgPicture.asset('assets/main/bg-farm.svg', fit: BoxFit.cover),
+          SvgPicture.asset(_bg, fit: BoxFit.cover),
           SafeArea(
             child: Column(
               children: [
