@@ -101,7 +101,7 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
   ui.FragmentProgram? _pencilProgram;
   bool _loading = true;
   bool _showingCompletion = false;
-  bool _showingPopup = false;
+  bool _showReplayButton = false;
   bool _showEarlyNextButton = false;
   bool _showAutoCompleteButton = false;
 
@@ -169,7 +169,7 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
     if (mounted) {
       setState(() {
         _showingCompletion = false;
-        _showingPopup = true;
+        _showReplayButton = true;
       });
       ref.read(coloringProvider.notifier).resetCompletion();
     }
@@ -198,7 +198,7 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
 
   void _replay() {
     setState(() {
-      _showingPopup = false;
+      _showReplayButton = false;
       _showEarlyNextButton = false;
       _showAutoCompleteButton = false;
     });
@@ -309,14 +309,19 @@ class _ColoringScreenState extends ConsumerState<ColoringScreen> {
                     child: _AutoCompleteButton(onTap: _autoComplete),
                   ),
                 ),
+                // 완성 후 다시 그리기 버튼 (다음 버튼 아래)
+                Positioned(
+                  top: 80,
+                  right: 0,
+                  child: AnimatedSlide(
+                    offset: _showReplayButton ? Offset.zero : const Offset(1.5, 0),
+                    duration: const Duration(milliseconds: 450),
+                    curve: Curves.easeOut,
+                    child: _ReplayButton(onTap: _replay),
+                  ),
+                ),
                 if (_showingCompletion)
                   CompletionOverlay(onDone: _onCompletionDone),
-                if (_showingPopup)
-                  _CompletionPopup(
-                    hasNext: widget.templateIndex + 1 < widget.allTemplates.length,
-                    onNext: _goNext,
-                    onReplay: _replay,
-                  ),
                 if (_debugCurrentIndex >= 0)
                   Positioned(
                     bottom: 24,
@@ -423,97 +428,39 @@ class _AutoCompleteButton extends StatelessWidget {
   }
 }
 
-// ── 완성 팝업 ─────────────────────────────────────────────────────────────────
+// ── 다시 그리기 버튼 (완성 후 다음 버튼 아래) ────────────────────────────────
 
-class _CompletionPopup extends StatelessWidget {
-  final bool hasNext;
-  final VoidCallback onNext;
-  final VoidCallback onReplay;
-
-  const _CompletionPopup({
-    required this.hasNext,
-    required this.onNext,
-    required this.onReplay,
-  });
+class _ReplayButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ReplayButton({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: ColoredBox(
-        color: Colors.black.withValues(alpha: 0.45),
-        child: Center(
-          child: Container(
-            width: 280,
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.18),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('🎉', style: TextStyle(fontSize: 52)),
-                const SizedBox(height: 8),
-                const Text(
-                  '완성!',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  '정말 잘했어요!',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black54,
-                  ),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: onNext,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: Text(
-                      hasNext ? '다음 그림 →' : '처음으로 →',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: onReplay,
-                  child: const Text(
-                    '다시 그리기',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.black38,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.only(left: 20, right: 12, top: 12, bottom: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFF8C42),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(28),
+            bottomLeft: Radius.circular(28),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF8C42).withValues(alpha: 0.4),
+              offset: const Offset(-2, 4),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('다시 그리기', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+            SizedBox(width: 6),
+            Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+          ],
         ),
       ),
     );
