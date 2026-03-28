@@ -46,7 +46,12 @@ class SvgColoringParser {
     // <style> 블록의 CSS 클래스 → 색상 맵 추출
     final cssClassColors = _parseCssClassColors(document);
 
-    final pathElements = document.findAllElements('path');
+    // path, circle, ellipse, rect, polygon 요소를 문서 순서대로 수집
+    const shapeNames = {'path', 'circle', 'ellipse', 'rect', 'polygon'};
+    final shapeElements = document
+        .findAllElements('*')
+        .where((e) => shapeNames.contains(e.localName));
+
     final result = <ColoringPath>[];
     final seenDStrings = <String>{};  // Illustrator 중복 path 제거용
 
@@ -55,22 +60,52 @@ class SvgColoringParser {
     int gCounter = 0;
 
     int index = 0;
-    for (final element in pathElements) {
-      final d = element.getAttribute('d');
-      if (d == null || d.isEmpty) {
-        index++;
-        continue;
-      }
+    for (final element in shapeElements) {
+      // 도형별 ui.Path 변환
+      ui.Path? path;
 
-      // 동일한 d 속성을 가진 중복 path 제거 (Illustrator export 아티팩트)
-      if (!seenDStrings.add(d)) {
-        index++;
-        continue;
-      }
+      switch (element.localName) {
+        case 'path':
+          final d = element.getAttribute('d');
+          if (d == null || d.isEmpty) { index++; continue; }
+          if (!seenDStrings.add(d)) { index++; continue; }
+          final fillRule = _resolveFillRule(element);
+          path = _parsePath(d, fillRule);
 
-      final fillRule = _resolveFillRule(element);
-      final color = _resolveFillColor(element, cssClassColors);
-      final path = _parsePath(d, fillRule);
+        case 'circle':
+          final cx = double.tryParse(element.getAttribute('cx') ?? '');
+          final cy = double.tryParse(element.getAttribute('cy') ?? '');
+          final r  = double.tryParse(element.getAttribute('r')  ?? '');
+          if (cx == null || cy == null || r == null || r <= 0) { index++; continue; }
+          path = ui.Path()..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: r));
+
+        case 'ellipse':
+          final cx = double.tryParse(element.getAttribute('cx') ?? '');
+          final cy = double.tryParse(element.getAttribute('cy') ?? '');
+          final rx = double.tryParse(element.getAttribute('rx') ?? '');
+          final ry = double.tryParse(element.getAttribute('ry') ?? '');
+          if (cx == null || cy == null || rx == null || ry == null || rx <= 0 || ry <= 0) { index++; continue; }
+          path = ui.Path()..addOval(Rect.fromLTWH(cx - rx, cy - ry, rx * 2, ry * 2));
+
+        case 'rect':
+          final x  = double.tryParse(element.getAttribute('x')      ?? '0') ?? 0;
+          final y  = double.tryParse(element.getAttribute('y')      ?? '0') ?? 0;
+          final w  = double.tryParse(element.getAttribute('width')  ?? '');
+          final h  = double.tryParse(element.getAttribute('height') ?? '');
+          if (w == null || h == null || w <= 0 || h <= 0) { index++; continue; }
+          final rx = double.tryParse(element.getAttribute('rx') ?? '0') ?? 0;
+          final ry = double.tryParse(element.getAttribute('ry') ?? '0') ?? 0;
+          path = ui.Path()..addRRect(RRect.fromLTRBXY(x, y, x + w, y + h, rx, ry));
+
+        case 'polygon':
+          final pointsAttr = element.getAttribute('points');
+          if (pointsAttr == null || pointsAttr.isEmpty) { index++; continue; }
+          path = _parsePolygon(pointsAttr);
+
+        default:
+          index++;
+          continue;
+      }
 
       final bounds = path.getBounds();
       final effectivePath = bounds.isEmpty ? (ui.Path()..addRect(Rect.zero)) : path;
@@ -78,8 +113,10 @@ class SvgColoringParser {
 
       final area = effectiveBounds.width * effectiveBounds.height;
       final isTiny = area < _tinyAreaThreshold;
-      final isWhite = color != null && _isNearWhite(color);
-      final isBlack = color != null && _isNearBlack(color);
+      final color = _resolveFillColor(element, cssClassColors);
+      final effectiveColor = color ?? Colors.black; // fill 미지정 시 SVG 기본값(검정)
+      final isWhite = _isNearWhite(effectiveColor);
+      final isBlack = _isNearBlack(effectiveColor);
 
       // 가장 가까운 부모 <g> 찾기
       final groupId = _resolveGroupId(element, gElementIds, () {
@@ -90,7 +127,7 @@ class SvgColoringParser {
       result.add(ColoringPath(
         index: index,
         path: effectivePath,
-        fillColor: color ?? const Color(0xFF2EA3AE),
+        fillColor: effectiveColor,
         bounds: effectiveBounds,
         isTiny: isTiny,
         isWhite: isWhite,
@@ -236,6 +273,25 @@ class SvgColoringParser {
   }
 
   // ── Path 파싱 ──────────────────────────────────────────────────────────────
+
+  static ui.Path _parsePolygon(String pointsAttr) {
+    final nums = pointsAttr
+        .trim()
+        .split(RegExp(r'[\s,]+'))
+        .map(double.tryParse)
+        .whereType<double>()
+        .toList();
+    final path = ui.Path();
+    for (int i = 0; i + 1 < nums.length; i += 2) {
+      if (i == 0) {
+        path.moveTo(nums[0], nums[1]);
+      } else {
+        path.lineTo(nums[i], nums[i + 1]);
+      }
+    }
+    path.close();
+    return path;
+  }
 
   static ui.Path _parsePath(String d, String? fillRule) {
     final path = ui.Path();
