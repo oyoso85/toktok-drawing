@@ -37,6 +37,9 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
   /// 미채움 단면 힌트: 0→10%→0 opacity, 1.5초 왕복 (3초 주기)
   late AnimationController _hintController;
 
+  /// 완성 시 외곽선 fade-out: 1.0 → 0.0, 1초
+  late AnimationController _strokeFadeController;
+
   final List<_AnimEntry> _activeAnims = [];
 
   ColoringTransform? _transform;
@@ -50,11 +53,17 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
         vsync: this, duration: const Duration(milliseconds: 1500))
       ..addListener(_onTick)
       ..repeat(reverse: true);
+    _strokeFadeController = AnimationController(
+        vsync: this,
+        duration: const Duration(seconds: 1),
+        value: 1.0)
+      ..addListener(_onTick);
   }
 
   @override
   void dispose() {
     _hintController.dispose();
+    _strokeFadeController.dispose();
     for (final entry in _activeAnims) {
       entry.controller.dispose();
     }
@@ -213,6 +222,15 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
   Widget build(BuildContext context) {
     final state = ref.watch(coloringProvider);
 
+    // 완성 시 stroke fade-out, 리셋 시 즉시 복원
+    ref.listen(coloringProvider.select((s) => s.isCompleted), (_, isCompleted) {
+      if (isCompleted) {
+        _strokeFadeController.reverse();
+      } else {
+        _strokeFadeController.value = 1.0;
+      }
+    });
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
@@ -237,6 +255,7 @@ class _ColoringCanvasState extends ConsumerState<ColoringCanvas>
                 paths: state.parsedPaths,
                 filledPaths: state.filledPaths,
                 hintOpacity: _hintController.value * 0.25,
+                strokeOpacity: _strokeFadeController.value,
                 activeAnimations: activeAnimations,
                 transformMatrix: _transform?.storage,
               ),

@@ -15,6 +15,9 @@ class ColoringPainter extends CustomPainter {
   /// 미채움 단면에 원본 색을 얼마나 비쳐 보이게 할지 (0.0 ~ 0.10).
   final double hintOpacity;
 
+  /// 외곽선(stroke) 불투명도. 완성 시 0.0으로 fade-out.
+  final double strokeOpacity;
+
   final List<ActiveFillAnimation> activeAnimations;
   final Float64List? transformMatrix;
 
@@ -22,6 +25,7 @@ class ColoringPainter extends CustomPainter {
     required this.paths,
     required this.filledPaths,
     this.hintOpacity = 0.0,
+    this.strokeOpacity = 1.0,
     this.activeAnimations = const [],
     this.transformMatrix,
   });
@@ -33,9 +37,11 @@ class ColoringPainter extends CustomPainter {
       canvas.transform(transformMatrix!);
     }
 
-    final strokePaint = Paint()
-      ..color = Colors.black
-      ..strokeWidth = 1.5
+    // strokeWidth를 2배로 설정 후 내부를 fill로 덮어 외부 stroke만 보이게 함.
+    // 결과: 좁은 path에서도 외부 1.5px 검정선만 보여 굵기가 일정하게 유지됨.
+    final outerStrokePaint = Paint()
+      ..color = Colors.black.withValues(alpha: strokeOpacity)
+      ..strokeWidth = 3.0
       ..style = PaintingStyle.stroke;
 
     final whitePaint = Paint()
@@ -52,14 +58,15 @@ class ColoringPainter extends CustomPainter {
       }
 
       final filledColor = filledPaths[cp.index];
+      // stroke를 먼저 그린 후 fill로 내부를 덮어 outer stroke 효과 적용
+      canvas.drawPath(cp.path, outerStrokePaint);
       if (filledColor != null) {
         // 채워진 path: 사용자가 선택한 색상
         canvas.drawPath(cp.path, Paint()
           ..color = filledColor
           ..style = PaintingStyle.fill);
-        canvas.drawPath(cp.path, strokePaint);
       } else {
-        // 미채움 interactive path: 흰색 fill + 검정 테두리
+        // 미채움 path: 흰색으로 내부 덮기
         canvas.drawPath(cp.path, whitePaint);
         if (cp.isInteractive && hintOpacity > 0.0) {
           canvas.drawPath(
@@ -69,7 +76,6 @@ class ColoringPainter extends CustomPainter {
               ..style = PaintingStyle.fill,
           );
         }
-        canvas.drawPath(cp.path, strokePaint);
       }
     }
 
@@ -94,5 +100,6 @@ class ColoringPainter extends CustomPainter {
   bool shouldRepaint(ColoringPainter old) =>
       old.filledPaths != filledPaths ||
       old.hintOpacity != hintOpacity ||
+      old.strokeOpacity != strokeOpacity ||
       old.activeAnimations != activeAnimations;
 }

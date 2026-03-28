@@ -25,9 +25,9 @@ class ColoringThumbnailPainter extends CustomPainter {
       canvas.transform(transformMatrix!);
     }
 
-    final strokePaint = Paint()
+    final outerStrokePaint = Paint()
       ..color = Colors.black
-      ..strokeWidth = 1.5
+      ..strokeWidth = 3.0
       ..style = PaintingStyle.stroke;
 
     final whitePaint = Paint()
@@ -35,7 +35,8 @@ class ColoringThumbnailPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     for (final cp in paths) {
-      if (!cp.isInteractive) {
+      // 흰색·검정만 원본 색으로 미리 채움. isTiny 유색은 일반 path와 동일하게 처리.
+      if (cp.isWhite || cp.isBlack) {
         canvas.drawPath(
           cp.path,
           Paint()
@@ -46,6 +47,7 @@ class ColoringThumbnailPainter extends CustomPainter {
       }
 
       final savedColor = filledPaths?[cp.index];
+      canvas.drawPath(cp.path, outerStrokePaint);
       if (savedColor != null) {
         // 완성된 도안: 저장된 색으로 채움
         canvas.drawPath(
@@ -55,9 +57,8 @@ class ColoringThumbnailPainter extends CustomPainter {
             ..style = PaintingStyle.fill,
         );
       } else {
-        // 미완성: 흰색 + 테두리
+        // 미완성: 흰색으로 내부 덮기
         canvas.drawPath(cp.path, whitePaint);
-        canvas.drawPath(cp.path, strokePaint);
       }
     }
 
